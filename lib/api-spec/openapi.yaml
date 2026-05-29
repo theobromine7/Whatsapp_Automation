@@ -326,6 +326,82 @@ paths:
         "200":
           description: Disconnected
 
+  /businesses/{id}/knowledge:
+    get:
+      operationId: listKnowledgeChunks
+      tags: [businesses]
+      summary: List knowledge chunks for a business
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: List of knowledge chunks
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/KnowledgeChunk"
+    post:
+      operationId: createKnowledgeChunk
+      tags: [businesses]
+      summary: Add a knowledge chunk for a business
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/KnowledgeChunkInput"
+      responses:
+        "201":
+          description: Created knowledge chunk
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/KnowledgeChunk"
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+
+  /businesses/{id}/knowledge/{chunkId}:
+    delete:
+      operationId: deleteKnowledgeChunk
+      tags: [businesses]
+      summary: Delete a knowledge chunk
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: chunkId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+
   /stats:
     get:
       operationId: getDashboardStats
@@ -578,6 +654,44 @@ components:
         - totalMessages
         - messagesToday
         - conversationsToday
+
+    KnowledgeChunk:
+      type: object
+      properties:
+        id:
+          type: integer
+        businessId:
+          type: integer
+        title:
+          type: string
+        content:
+          type: string
+        sourceType:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - businessId
+        - title
+        - content
+        - sourceType
+        - createdAt
+
+    KnowledgeChunkInput:
+      type: object
+      properties:
+        title:
+          type: string
+        content:
+          type: string
+        sourceType:
+          type: string
+      required:
+        - title
+        - content
+        - sourceType
 
     BusinessStats:
       type: object

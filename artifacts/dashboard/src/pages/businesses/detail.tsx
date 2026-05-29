@@ -38,6 +38,7 @@ import {
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { KnowledgeTab } from "./knowledge-tab";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
@@ -478,12 +479,15 @@ export default function BusinessDetail() {
 
       {/* Main tabs */}
       <Tabs defaultValue={isConnected ? "conversations" : "connect"} className="w-full">
-        <TabsList className="grid w-full grid-cols-3 max-w-md">
+        <TabsList className="grid w-full grid-cols-4 max-w-xl">
           <TabsTrigger value="connect" className="gap-1.5">
             <Link2 className="w-3.5 h-3.5" /> Connect
           </TabsTrigger>
           <TabsTrigger value="conversations" className="gap-1.5">
             <MessageSquare className="w-3.5 h-3.5" /> Chats
+          </TabsTrigger>
+          <TabsTrigger value="knowledge" className="gap-1.5">
+            <BarChart3 className="w-3.5 h-3.5" /> Knowledge
           </TabsTrigger>
           <TabsTrigger value="settings" className="gap-1.5">
             <Settings2 className="w-3.5 h-3.5" /> Settings
@@ -611,6 +615,11 @@ export default function BusinessDetail() {
               )}
             </CardContent>
           </Card>
+        </TabsContent>
+
+        {/* ── Knowledge Tab ── */}
+        <TabsContent value="knowledge" className="pt-4">
+          <KnowledgeTab businessId={businessId} />
         </TabsContent>
 
         {/* ── Settings Tab ── */}

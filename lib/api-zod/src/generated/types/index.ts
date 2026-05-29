@@ -13,6 +13,8 @@ export * from './businessStats';
 export * from './businessUpdate';
 export * from './dashboardStats';
 export * from './healthStatus';
+export * from './knowledgeChunk';
+export * from './knowledgeChunkInput';
 export * from './metaCredentials';
 export * from './sessionStatus';
 export * from './verifyWhatsappWebhookParams';

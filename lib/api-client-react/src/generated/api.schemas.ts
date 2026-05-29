@@ -112,6 +112,21 @@ export interface DashboardStats {
   conversationsToday: number;
 }
 
+export interface KnowledgeChunk {
+  id: number;
+  businessId: number;
+  title: string;
+  content: string;
+  sourceType: string;
+  createdAt: string;
+}
+
+export interface KnowledgeChunkInput {
+  title: string;
+  content: string;
+  sourceType: string;
+}
+
 export interface BusinessStats {
   totalConversations: number;
   totalMessages: number;

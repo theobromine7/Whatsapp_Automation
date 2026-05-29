@@ -286,6 +286,47 @@ export const DisconnectSessionParams = zod.object({
 
 
 /**
+ * @summary List knowledge chunks for a business
+ */
+export const ListKnowledgeChunksParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const ListKnowledgeChunksResponseItem = zod.object({
+  "id": zod.number(),
+  "businessId": zod.number(),
+  "title": zod.string(),
+  "content": zod.string(),
+  "sourceType": zod.string(),
+  "createdAt": zod.coerce.date()
+})
+export const ListKnowledgeChunksResponse = zod.array(ListKnowledgeChunksResponseItem)
+
+
+/**
+ * @summary Add a knowledge chunk for a business
+ */
+export const CreateKnowledgeChunkParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const CreateKnowledgeChunkBody = zod.object({
+  "title": zod.string(),
+  "content": zod.string(),
+  "sourceType": zod.string()
+})
+
+
+/**
+ * @summary Delete a knowledge chunk
+ */
+export const DeleteKnowledgeChunkParams = zod.object({
+  "id": zod.coerce.number(),
+  "chunkId": zod.coerce.number()
+})
+
+
+/**
  * @summary Get platform-wide dashboard statistics
  */
 export const GetDashboardStatsResponse = zod.object({

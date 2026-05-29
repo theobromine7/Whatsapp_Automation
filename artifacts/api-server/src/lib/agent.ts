@@ -1,6 +1,6 @@
-import { ai } from "@workspace/integrations-gemini-ai";
-import { db, whatsappMessagesTable } from "@workspace/db";
-import { eq } from "drizzle-orm";
+import { ai, embedText } from "@workspace/integrations-gemini-ai";
+import { db, whatsappMessagesTable, knowledgeChunksTable } from "@workspace/db";
+import { eq, sql } from "drizzle-orm";
 import { logger } from "./logger";
 import type { Business } from "@workspace/db";
 
@@ -27,12 +27,18 @@ export async function generateAIResponse(
     parts: [{ text: customerMessage }],
   });
 
+  const ragContext = await retrieveRelevantChunks(business.id, customerMessage);
+
+  const fullSystemPrompt = ragContext
+    ? `${systemPrompt}\n\n${ragContext}`
+    : systemPrompt;
+
   try {
     const response = await ai.models.generateContent({
       model: "gemini-2.5-flash",
       contents: chatHistory,
       config: {
-        systemInstruction: systemPrompt,
+        systemInstruction: fullSystemPrompt,
         maxOutputTokens: 8192,
       },
     });
@@ -41,6 +47,57 @@ export async function generateAIResponse(
   } catch (error) {
     logger.error({ error, businessId: business.id }, "Gemini API error");
     throw error;
+  }
+}
+
+async function retrieveRelevantChunks(
+  businessId: number,
+  query: string,
+  topK = 3
+): Promise<string | null> {
+  try {
+    const chunks = await db
+      .select({ id: knowledgeChunksTable.id })
+      .from(knowledgeChunksTable)
+      .where(eq(knowledgeChunksTable.businessId, businessId))
+      .limit(1);
+
+    if (chunks.length === 0) return null;
+
+    const queryEmbedding = await embedText(query);
+    const embeddingLiteral = `[${queryEmbedding.join(",")}]`;
+
+    const results = await db.execute(sql`
+      SELECT id, title, content, source_type,
+             1 - (embedding <=> ${embeddingLiteral}::vector) AS similarity
+      FROM business_knowledge_chunks
+      WHERE business_id = ${businessId}
+        AND embedding IS NOT NULL
+      ORDER BY embedding <=> ${embeddingLiteral}::vector
+      LIMIT ${topK}
+    `);
+
+    const rows = results.rows as Array<{
+      id: number;
+      title: string;
+      content: string;
+      source_type: string;
+      similarity: number;
+    }>;
+
+    if (rows.length === 0) return null;
+
+    const relevant = rows.filter((r) => r.similarity > 0.4);
+    if (relevant.length === 0) return null;
+
+    const contextBlock = relevant
+      .map((r) => `[${r.source_type.toUpperCase()}] ${r.title}:\n${r.content}`)
+      .join("\n\n---\n\n");
+
+    return `RELEVANT KNOWLEDGE BASE (use this to answer accurately):\n\n${contextBlock}`;
+  } catch (err) {
+    logger.warn({ err, businessId }, "RAG retrieval failed, proceeding without context");
+    return null;
   }
 }
 

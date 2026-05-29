@@ -27,6 +27,8 @@ import type {
   BusinessUpdate,
   DashboardStats,
   HealthStatus,
+  KnowledgeChunk,
+  KnowledgeChunkInput,
   MetaCredentials,
   SessionStatus,
   VerifyWhatsappWebhookParams,
@@ -1157,6 +1159,227 @@ export const useDisconnectSession = <TError = ErrorType<unknown>,
         TContext
       > => {
       return useMutation(getDisconnectSessionMutationOptions(options));
+    }
+
+export const getListKnowledgeChunksUrl = (id: number,) => {
+
+
+
+
+  return `/api/businesses/${id}/knowledge`
+}
+
+/**
+ * @summary List knowledge chunks for a business
+ */
+export const listKnowledgeChunks = async (id: number, options?: RequestInit): Promise<KnowledgeChunk[]> => {
+
+  return customFetch<KnowledgeChunk[]>(getListKnowledgeChunksUrl(id),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListKnowledgeChunksQueryKey = (id: number,) => {
+    return [
+    `/api/businesses/${id}/knowledge`
+    ] as const;
+    }
+
+
+export const getListKnowledgeChunksQueryOptions = <TData = Awaited<ReturnType<typeof listKnowledgeChunks>>, TError = ErrorType<unknown>>(id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listKnowledgeChunks>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListKnowledgeChunksQueryKey(id);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listKnowledgeChunks>>> = ({ signal }) => listKnowledgeChunks(id, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: !!(id), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listKnowledgeChunks>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListKnowledgeChunksQueryResult = NonNullable<Awaited<ReturnType<typeof listKnowledgeChunks>>>
+export type ListKnowledgeChunksQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary List knowledge chunks for a business
+ */
+
+export function useListKnowledgeChunks<TData = Awaited<ReturnType<typeof listKnowledgeChunks>>, TError = ErrorType<unknown>>(
+ id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listKnowledgeChunks>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListKnowledgeChunksQueryOptions(id,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getCreateKnowledgeChunkUrl = (id: number,) => {
+
+
+
+
+  return `/api/businesses/${id}/knowledge`
+}
+
+/**
+ * @summary Add a knowledge chunk for a business
+ */
+export const createKnowledgeChunk = async (id: number,
+    knowledgeChunkInput: KnowledgeChunkInput, options?: RequestInit): Promise<KnowledgeChunk> => {
+
+  return customFetch<KnowledgeChunk>(getCreateKnowledgeChunkUrl(id),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      knowledgeChunkInput,)
+  }
+);}
+
+
+
+
+export const getCreateKnowledgeChunkMutationOptions = <TError = ErrorType<ApiError>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createKnowledgeChunk>>, TError,{id: number;data: BodyType<KnowledgeChunkInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof createKnowledgeChunk>>, TError,{id: number;data: BodyType<KnowledgeChunkInput>}, TContext> => {
+
+const mutationKey = ['createKnowledgeChunk'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createKnowledgeChunk>>, {id: number;data: BodyType<KnowledgeChunkInput>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  createKnowledgeChunk(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CreateKnowledgeChunkMutationResult = NonNullable<Awaited<ReturnType<typeof createKnowledgeChunk>>>
+    export type CreateKnowledgeChunkMutationBody = BodyType<KnowledgeChunkInput>
+    export type CreateKnowledgeChunkMutationError = ErrorType<ApiError>
+
+    /**
+ * @summary Add a knowledge chunk for a business
+ */
+export const useCreateKnowledgeChunk = <TError = ErrorType<ApiError>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createKnowledgeChunk>>, TError,{id: number;data: BodyType<KnowledgeChunkInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof createKnowledgeChunk>>,
+        TError,
+        {id: number;data: BodyType<KnowledgeChunkInput>},
+        TContext
+      > => {
+      return useMutation(getCreateKnowledgeChunkMutationOptions(options));
+    }
+
+export const getDeleteKnowledgeChunkUrl = (id: number,
+    chunkId: number,) => {
+
+
+
+
+  return `/api/businesses/${id}/knowledge/${chunkId}`
+}
+
+/**
+ * @summary Delete a knowledge chunk
+ */
+export const deleteKnowledgeChunk = async (id: number,
+    chunkId: number, options?: RequestInit): Promise<void> => {
+
+  return customFetch<void>(getDeleteKnowledgeChunkUrl(id,chunkId),
+  {
+    ...options,
+    method: 'DELETE'
+
+
+  }
+);}
+
+
+
+
+export const getDeleteKnowledgeChunkMutationOptions = <TError = ErrorType<ApiError>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteKnowledgeChunk>>, TError,{id: number;chunkId: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof deleteKnowledgeChunk>>, TError,{id: number;chunkId: number}, TContext> => {
+
+const mutationKey = ['deleteKnowledgeChunk'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof deleteKnowledgeChunk>>, {id: number;chunkId: number}> = (props) => {
+          const {id,chunkId} = props ?? {};
+
+          return  deleteKnowledgeChunk(id,chunkId,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type DeleteKnowledgeChunkMutationResult = NonNullable<Awaited<ReturnType<typeof deleteKnowledgeChunk>>>
+
+    export type DeleteKnowledgeChunkMutationError = ErrorType<ApiError>
+
+    /**
+ * @summary Delete a knowledge chunk
+ */
+export const useDeleteKnowledgeChunk = <TError = ErrorType<ApiError>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteKnowledgeChunk>>, TError,{id: number;chunkId: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof deleteKnowledgeChunk>>,
+        TError,
+        {id: number;chunkId: number},
+        TContext
+      > => {
+      return useMutation(getDeleteKnowledgeChunkMutationOptions(options));
     }
 
 export const getGetDashboardStatsUrl = () => {

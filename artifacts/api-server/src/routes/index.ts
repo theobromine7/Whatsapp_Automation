@@ -6,6 +6,7 @@ import whatsappRouter from "./whatsapp";
 import statsRouter from "./stats";
 import testConnectionRouter from "./test-connection";
 import sessionsRouter from "./sessions";
+import knowledgeRouter from "./knowledge";
 
 const router: IRouter = Router();
 
@@ -16,5 +17,6 @@ router.use(whatsappRouter);
 router.use(statsRouter);
 router.use(testConnectionRouter);
 router.use(sessionsRouter);
+router.use(knowledgeRouter);
 
 export default router;

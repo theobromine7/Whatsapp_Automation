@@ -1,4 +1,4 @@
-modules = ["nodejs-20", "web", "bash"]
+modules = ["nodejs-20", "web", "bash", "postgresql-16"]
 
 [deployment]
 router = "application"
@@ -76,6 +76,7 @@ channel = "stable-25_05"
 
 [userenv.shared]
 AI_INTEGRATIONS_GEMINI_BASE_URL = "https://generativelanguage.googleapis.com"
+BASE_PATH = "/"
 
 [userenv.development]
 PORT = "8080"

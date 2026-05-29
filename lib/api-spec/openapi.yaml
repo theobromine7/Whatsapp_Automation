@@ -1,0 +1,602 @@
+openapi: 3.1.0
+info:
+  title: Api
+  version: 0.1.0
+  description: WhatsApp AI Sales Agent Platform API
+servers:
+  - url: /api
+    description: Base API path
+tags:
+  - name: health
+    description: Health operations
+  - name: businesses
+    description: Business registration and management
+  - name: whatsapp
+    description: WhatsApp webhook and message operations
+  - name: conversations
+    description: Conversation management
+  - name: stats
+    description: Dashboard statistics
+  - name: sessions
+    description: WhatsApp QR session management
+paths:
+  /healthz:
+    get:
+      operationId: healthCheck
+      tags: [health]
+      summary: Health check
+      responses:
+        "200":
+          description: Healthy
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthStatus"
+
+  /businesses:
+    get:
+      operationId: listBusinesses
+      tags: [businesses]
+      summary: List all registered businesses
+      responses:
+        "200":
+          description: List of businesses
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Business"
+    post:
+      operationId: createBusiness
+      tags: [businesses]
+      summary: Register a new business
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BusinessInput"
+      responses:
+        "201":
+          description: Created business
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Business"
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+
+  /businesses/{id}:
+    get:
+      operationId: getBusiness
+      tags: [businesses]
+      summary: Get a business by ID
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Business
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Business"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+    patch:
+      operationId: updateBusiness
+      tags: [businesses]
+      summary: Update a business
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BusinessUpdate"
+      responses:
+        "200":
+          description: Updated business
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Business"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+    delete:
+      operationId: deleteBusiness
+      tags: [businesses]
+      summary: Delete a business
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+
+  /businesses/{id}/toggle:
+    patch:
+      operationId: toggleBusiness
+      tags: [businesses]
+      summary: Toggle bot active status
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Updated business
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Business"
+
+  /businesses/{id}/connect-meta:
+    post:
+      operationId: connectBusinessMeta
+      tags: [businesses]
+      summary: Connect business via Meta Cloud API credentials
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/MetaCredentials"
+      responses:
+        "200":
+          description: Updated business
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Business"
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+
+  /businesses/{id}/conversations:
+    get:
+      operationId: listBusinessConversations
+      tags: [conversations]
+      summary: List conversations for a business
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: List of conversations
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/WhatsappConversation"
+
+  /conversations/{id}/messages:
+    get:
+      operationId: listConversationMessages
+      tags: [conversations]
+      summary: List messages in a conversation
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Messages
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/WhatsappMessage"
+
+  /whatsapp/webhook:
+    get:
+      operationId: verifyWhatsappWebhook
+      tags: [whatsapp]
+      summary: Verify Meta webhook challenge
+      parameters:
+        - name: hub.mode
+          in: query
+          schema:
+            type: string
+        - name: hub.verify_token
+          in: query
+          schema:
+            type: string
+        - name: hub.challenge
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Challenge response
+        "403":
+          description: Forbidden
+    post:
+      operationId: handleWhatsappWebhook
+      tags: [whatsapp]
+      summary: Receive incoming WhatsApp messages
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/WebhookPayload"
+      responses:
+        "200":
+          description: OK
+
+  /sessions/{businessId}/start:
+    post:
+      operationId: startQrSession
+      tags: [sessions]
+      summary: Start a QR session for a business
+      parameters:
+        - name: businessId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Session started
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SessionStatus"
+
+  /sessions/{businessId}/status:
+    get:
+      operationId: getSessionStatus
+      tags: [sessions]
+      summary: Get current session status
+      parameters:
+        - name: businessId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Status
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SessionStatus"
+
+  /sessions/{businessId}/disconnect:
+    post:
+      operationId: disconnectSession
+      tags: [sessions]
+      summary: Disconnect a QR session
+      parameters:
+        - name: businessId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Disconnected
+
+  /stats:
+    get:
+      operationId: getDashboardStats
+      tags: [stats]
+      summary: Get platform-wide dashboard statistics
+      responses:
+        "200":
+          description: Stats
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DashboardStats"
+
+  /stats/businesses/{id}:
+    get:
+      operationId: getBusinessStats
+      tags: [stats]
+      summary: Get stats for a specific business
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Business stats
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BusinessStats"
+
+components:
+  schemas:
+    HealthStatus:
+      type: object
+      properties:
+        status:
+          type: string
+      required:
+        - status
+
+    ApiError:
+      type: object
+      properties:
+        error:
+          type: string
+      required:
+        - error
+
+    Business:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        businessType:
+          type: string
+        description:
+          type: string
+        systemPrompt:
+          type: string
+        products:
+          type: ["string", "null"]
+        faqs:
+          type: ["string", "null"]
+        isActive:
+          type: boolean
+        connectionType:
+          type: string
+        whatsappPhoneNumber:
+          type: ["string", "null"]
+        whatsappPhoneNumberId:
+          type: ["string", "null"]
+        whatsappAccessToken:
+          type: ["string", "null"]
+        webhookVerifyToken:
+          type: ["string", "null"]
+        sessionStatus:
+          type: ["string", "null"]
+        connectedPhone:
+          type: ["string", "null"]
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - name
+        - businessType
+        - description
+        - systemPrompt
+        - isActive
+        - connectionType
+        - createdAt
+        - updatedAt
+
+    BusinessInput:
+      type: object
+      properties:
+        name:
+          type: string
+        businessType:
+          type: string
+        description:
+          type: string
+        systemPrompt:
+          type: string
+        products:
+          type: string
+        faqs:
+          type: string
+      required:
+        - name
+        - businessType
+        - description
+        - systemPrompt
+
+    BusinessUpdate:
+      type: object
+      properties:
+        name:
+          type: string
+        businessType:
+          type: string
+        description:
+          type: string
+        systemPrompt:
+          type: string
+        products:
+          type: string
+        faqs:
+          type: string
+        isActive:
+          type: boolean
+
+    MetaCredentials:
+      type: object
+      properties:
+        whatsappPhoneNumber:
+          type: string
+        whatsappPhoneNumberId:
+          type: string
+        whatsappAccessToken:
+          type: string
+        webhookVerifyToken:
+          type: string
+      required:
+        - whatsappPhoneNumber
+        - whatsappPhoneNumberId
+        - whatsappAccessToken
+        - webhookVerifyToken
+
+    WhatsappConversation:
+      type: object
+      properties:
+        id:
+          type: integer
+        businessId:
+          type: integer
+        customerPhone:
+          type: string
+        customerName:
+          type: ["string", "null"]
+        messageCount:
+          type: integer
+        lastMessageAt:
+          type: ["string", "null"]
+          format: date-time
+        createdAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - businessId
+        - customerPhone
+        - messageCount
+        - createdAt
+
+    WhatsappMessage:
+      type: object
+      properties:
+        id:
+          type: integer
+        conversationId:
+          type: integer
+        role:
+          type: string
+        content:
+          type: string
+        whatsappMessageId:
+          type: ["string", "null"]
+        createdAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - conversationId
+        - role
+        - content
+        - createdAt
+
+    WebhookPayload:
+      type: object
+      properties:
+        object:
+          type: string
+        entry:
+          type: array
+          items:
+            type: object
+      required:
+        - object
+
+    SessionStatus:
+      type: object
+      properties:
+        businessId:
+          type: integer
+        status:
+          type: string
+        connectedPhone:
+          type: ["string", "null"]
+      required:
+        - businessId
+        - status
+
+    DashboardStats:
+      type: object
+      properties:
+        totalBusinesses:
+          type: integer
+        activeBusinesses:
+          type: integer
+        totalConversations:
+          type: integer
+        totalMessages:
+          type: integer
+        messagesToday:
+          type: integer
+        conversationsToday:
+          type: integer
+      required:
+        - totalBusinesses
+        - activeBusinesses
+        - totalConversations
+        - totalMessages
+        - messagesToday
+        - conversationsToday
+
+    BusinessStats:
+      type: object
+      properties:
+        totalConversations:
+          type: integer
+        totalMessages:
+          type: integer
+        messagesThisWeek:
+          type: integer
+        activeCustomers:
+          type: integer
+        recentConversations:
+          type: array
+          items:
+            $ref: "#/components/schemas/WhatsappConversation"
+      required:
+        - totalConversations
+        - totalMessages
+        - messagesThisWeek
+        - activeCustomers
+        - recentConversations

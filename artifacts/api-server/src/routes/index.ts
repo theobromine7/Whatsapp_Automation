@@ -7,6 +7,7 @@ import statsRouter from "./stats";
 import testConnectionRouter from "./test-connection";
 import sessionsRouter from "./sessions";
 import knowledgeRouter from "./knowledge";
+import broadcastsRouter from "./broadcasts";
 
 const router: IRouter = Router();
 
@@ -18,5 +19,6 @@ router.use(statsRouter);
 router.use(testConnectionRouter);
 router.use(sessionsRouter);
 router.use(knowledgeRouter);
+router.use(broadcastsRouter);
 
 export default router;

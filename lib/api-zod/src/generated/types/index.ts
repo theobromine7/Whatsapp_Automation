@@ -7,10 +7,13 @@
  */
 
 export * from './apiError';
+export * from './broadcast';
+export * from './broadcastInput';
 export * from './business';
 export * from './businessInput';
 export * from './businessStats';
 export * from './businessUpdate';
+export * from './contact';
 export * from './dashboardStats';
 export * from './healthStatus';
 export * from './knowledgeChunk';

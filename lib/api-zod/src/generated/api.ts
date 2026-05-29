@@ -327,6 +327,52 @@ export const DeleteKnowledgeChunkParams = zod.object({
 
 
 /**
+ * @summary List unique customers who have contacted this business
+ */
+export const ListContactsParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const ListContactsResponseItem = zod.object({
+  "customerPhone": zod.string(),
+  "customerName": zod.string().nullish(),
+  "lastSeen": zod.coerce.date(),
+  "firstSeen": zod.coerce.date()
+})
+export const ListContactsResponse = zod.array(ListContactsResponseItem)
+
+
+/**
+ * @summary List broadcast history for a business
+ */
+export const ListBroadcastsParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const ListBroadcastsResponseItem = zod.object({
+  "id": zod.number(),
+  "businessId": zod.number(),
+  "triggerChunkId": zod.number().nullish(),
+  "message": zod.string(),
+  "recipientCount": zod.number(),
+  "createdAt": zod.coerce.date()
+})
+export const ListBroadcastsResponse = zod.array(ListBroadcastsResponseItem)
+
+
+/**
+ * @summary Send a manual broadcast to recent customers
+ */
+export const SendBroadcastParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const SendBroadcastBody = zod.object({
+  "message": zod.string()
+})
+
+
+/**
  * @summary Get platform-wide dashboard statistics
  */
 export const GetDashboardStatsResponse = zod.object({

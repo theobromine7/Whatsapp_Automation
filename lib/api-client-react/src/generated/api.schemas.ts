@@ -112,6 +112,26 @@ export interface DashboardStats {
   conversationsToday: number;
 }
 
+export interface Contact {
+  customerPhone: string;
+  customerName?: string | null;
+  lastSeen: string;
+  firstSeen: string;
+}
+
+export interface Broadcast {
+  id: number;
+  businessId: number;
+  triggerChunkId?: number | null;
+  message: string;
+  recipientCount: number;
+  createdAt: string;
+}
+
+export interface BroadcastInput {
+  message: string;
+}
+
 export interface KnowledgeChunk {
   id: number;
   businessId: number;

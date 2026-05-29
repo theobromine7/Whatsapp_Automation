@@ -21,10 +21,13 @@ import type {
 
 import type {
   ApiError,
+  Broadcast,
+  BroadcastInput,
   Business,
   BusinessInput,
   BusinessStats,
   BusinessUpdate,
+  Contact,
   DashboardStats,
   HealthStatus,
   KnowledgeChunk,
@@ -1380,6 +1383,232 @@ export const useDeleteKnowledgeChunk = <TError = ErrorType<ApiError>,
         TContext
       > => {
       return useMutation(getDeleteKnowledgeChunkMutationOptions(options));
+    }
+
+export const getListContactsUrl = (id: number,) => {
+
+
+
+
+  return `/api/businesses/${id}/contacts`
+}
+
+/**
+ * @summary List unique customers who have contacted this business
+ */
+export const listContacts = async (id: number, options?: RequestInit): Promise<Contact[]> => {
+
+  return customFetch<Contact[]>(getListContactsUrl(id),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListContactsQueryKey = (id: number,) => {
+    return [
+    `/api/businesses/${id}/contacts`
+    ] as const;
+    }
+
+
+export const getListContactsQueryOptions = <TData = Awaited<ReturnType<typeof listContacts>>, TError = ErrorType<unknown>>(id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listContacts>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListContactsQueryKey(id);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listContacts>>> = ({ signal }) => listContacts(id, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: !!(id), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listContacts>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListContactsQueryResult = NonNullable<Awaited<ReturnType<typeof listContacts>>>
+export type ListContactsQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary List unique customers who have contacted this business
+ */
+
+export function useListContacts<TData = Awaited<ReturnType<typeof listContacts>>, TError = ErrorType<unknown>>(
+ id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listContacts>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListContactsQueryOptions(id,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getListBroadcastsUrl = (id: number,) => {
+
+
+
+
+  return `/api/businesses/${id}/broadcasts`
+}
+
+/**
+ * @summary List broadcast history for a business
+ */
+export const listBroadcasts = async (id: number, options?: RequestInit): Promise<Broadcast[]> => {
+
+  return customFetch<Broadcast[]>(getListBroadcastsUrl(id),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListBroadcastsQueryKey = (id: number,) => {
+    return [
+    `/api/businesses/${id}/broadcasts`
+    ] as const;
+    }
+
+
+export const getListBroadcastsQueryOptions = <TData = Awaited<ReturnType<typeof listBroadcasts>>, TError = ErrorType<unknown>>(id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listBroadcasts>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListBroadcastsQueryKey(id);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listBroadcasts>>> = ({ signal }) => listBroadcasts(id, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: !!(id), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listBroadcasts>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListBroadcastsQueryResult = NonNullable<Awaited<ReturnType<typeof listBroadcasts>>>
+export type ListBroadcastsQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary List broadcast history for a business
+ */
+
+export function useListBroadcasts<TData = Awaited<ReturnType<typeof listBroadcasts>>, TError = ErrorType<unknown>>(
+ id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listBroadcasts>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListBroadcastsQueryOptions(id,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getSendBroadcastUrl = (id: number,) => {
+
+
+
+
+  return `/api/businesses/${id}/broadcasts`
+}
+
+/**
+ * @summary Send a manual broadcast to recent customers
+ */
+export const sendBroadcast = async (id: number,
+    broadcastInput: BroadcastInput, options?: RequestInit): Promise<Broadcast> => {
+
+  return customFetch<Broadcast>(getSendBroadcastUrl(id),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      broadcastInput,)
+  }
+);}
+
+
+
+
+export const getSendBroadcastMutationOptions = <TError = ErrorType<ApiError>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof sendBroadcast>>, TError,{id: number;data: BodyType<BroadcastInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof sendBroadcast>>, TError,{id: number;data: BodyType<BroadcastInput>}, TContext> => {
+
+const mutationKey = ['sendBroadcast'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof sendBroadcast>>, {id: number;data: BodyType<BroadcastInput>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  sendBroadcast(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type SendBroadcastMutationResult = NonNullable<Awaited<ReturnType<typeof sendBroadcast>>>
+    export type SendBroadcastMutationBody = BodyType<BroadcastInput>
+    export type SendBroadcastMutationError = ErrorType<ApiError>
+
+    /**
+ * @summary Send a manual broadcast to recent customers
+ */
+export const useSendBroadcast = <TError = ErrorType<ApiError>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof sendBroadcast>>, TError,{id: number;data: BodyType<BroadcastInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof sendBroadcast>>,
+        TError,
+        {id: number;data: BodyType<BroadcastInput>},
+        TContext
+      > => {
+      return useMutation(getSendBroadcastMutationOptions(options));
     }
 
 export const getGetDashboardStatsUrl = () => {

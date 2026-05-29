@@ -402,6 +402,83 @@ paths:
               schema:
                 $ref: "#/components/schemas/ApiError"
 
+  /businesses/{id}/contacts:
+    get:
+      operationId: listContacts
+      tags: [businesses]
+      summary: List unique customers who have contacted this business
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: List of contacts
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Contact"
+
+  /businesses/{id}/broadcasts:
+    get:
+      operationId: listBroadcasts
+      tags: [businesses]
+      summary: List broadcast history for a business
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: List of broadcasts
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Broadcast"
+    post:
+      operationId: sendBroadcast
+      tags: [businesses]
+      summary: Send a manual broadcast to recent customers
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BroadcastInput"
+      responses:
+        "201":
+          description: Broadcast sent
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Broadcast"
+        "400":
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+        "404":
+          description: Business not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+
   /stats:
     get:
       operationId: getDashboardStats
@@ -654,6 +731,57 @@ components:
         - totalMessages
         - messagesToday
         - conversationsToday
+
+    Contact:
+      type: object
+      properties:
+        customerPhone:
+          type: string
+        customerName:
+          type: string
+          nullable: true
+        lastSeen:
+          type: string
+          format: date-time
+        firstSeen:
+          type: string
+          format: date-time
+      required:
+        - customerPhone
+        - lastSeen
+        - firstSeen
+
+    Broadcast:
+      type: object
+      properties:
+        id:
+          type: integer
+        businessId:
+          type: integer
+        triggerChunkId:
+          type: integer
+          nullable: true
+        message:
+          type: string
+        recipientCount:
+          type: integer
+        createdAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - businessId
+        - message
+        - recipientCount
+        - createdAt
+
+    BroadcastInput:
+      type: object
+      properties:
+        message:
+          type: string
+      required:
+        - message
 
     KnowledgeChunk:
       type: object

@@ -2,6 +2,7 @@ import { Router, type IRouter } from "express";
 import { eq, and } from "drizzle-orm";
 import { db, knowledgeChunksTable, businessesTable } from "@workspace/db";
 import { embedText } from "@workspace/integrations-gemini-ai";
+import { broadcastToRecentCustomers, buildProductBroadcastMessage } from "../lib/broadcast";
 
 const router: IRouter = Router();
 
@@ -53,7 +54,12 @@ router.post("/businesses/:id/knowledge", async (req, res): Promise<void> => {
   }
 
   const [business] = await db
-    .select({ id: businessesTable.id })
+    .select({
+      id: businessesTable.id,
+      name: businessesTable.name,
+      whatsappPhoneNumberId: businessesTable.whatsappPhoneNumberId,
+      whatsappAccessToken: businessesTable.whatsappAccessToken,
+    })
     .from(businessesTable)
     .where(eq(businessesTable.id, id));
   if (!business) {
@@ -91,6 +97,13 @@ router.post("/businesses/:id/knowledge", async (req, res): Promise<void> => {
       sourceType: knowledgeChunksTable.sourceType,
       createdAt: knowledgeChunksTable.createdAt,
     });
+
+  if (input.sourceType === "product") {
+    const broadcastMsg = buildProductBroadcastMessage(business.name, input.title, input.content);
+    broadcastToRecentCustomers(business, broadcastMsg, chunk.id).catch((err) => {
+      req.log?.warn({ err }, "Auto-broadcast after product addition failed silently");
+    });
+  }
 
   res.status(201).json(chunk);
 });

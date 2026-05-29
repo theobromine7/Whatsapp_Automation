@@ -1,12 +1,14 @@
 import { db, broadcastsTable, whatsappConversationsTable } from "@workspace/db";
 import { eq, gte, and } from "drizzle-orm";
 import { sendWhatsappMessage } from "./whatsapp";
+import { sendMessageViaSession } from "./session-manager";
 import { logger } from "./logger";
 
 export async function broadcastToRecentCustomers(
   business: {
     id: number;
     name: string;
+    connectionType: string;
     whatsappPhoneNumberId: string | null;
     whatsappAccessToken: string | null;
   },
@@ -28,9 +30,16 @@ export async function broadcastToRecentCustomers(
 
   let sent = 0;
 
-  if (business.whatsappPhoneNumberId && business.whatsappAccessToken && customers.length > 0) {
-    for (const { customerPhone } of customers) {
-      try {
+  for (const { customerPhone } of customers) {
+    try {
+      if (business.connectionType === "qr_session") {
+        await sendMessageViaSession(business.id, customerPhone, message);
+        sent++;
+      } else if (
+        business.connectionType === "meta_cloud" &&
+        business.whatsappPhoneNumberId &&
+        business.whatsappAccessToken
+      ) {
         await sendWhatsappMessage(
           business.whatsappPhoneNumberId,
           business.whatsappAccessToken,
@@ -38,9 +47,9 @@ export async function broadcastToRecentCustomers(
           message
         );
         sent++;
-      } catch (err) {
-        logger.warn({ err, phone: customerPhone }, "Broadcast: failed to send to customer");
       }
+    } catch (err) {
+      logger.warn({ err, phone: customerPhone }, "Broadcast: failed to send to customer");
     }
   }
 

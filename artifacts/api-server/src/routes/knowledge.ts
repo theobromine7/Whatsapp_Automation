@@ -57,6 +57,7 @@ router.post("/businesses/:id/knowledge", async (req, res): Promise<void> => {
     .select({
       id: businessesTable.id,
       name: businessesTable.name,
+      connectionType: businessesTable.connectionType,
       whatsappPhoneNumberId: businessesTable.whatsappPhoneNumberId,
       whatsappAccessToken: businessesTable.whatsappAccessToken,
     })

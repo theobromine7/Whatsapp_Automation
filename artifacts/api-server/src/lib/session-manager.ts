@@ -250,6 +250,16 @@ export function getSessionStatus(businessId: number): { status: string; connecte
   return { status: entry.status, connectedPhone: entry.connectedPhone };
 }
 
+export async function sendMessageViaSession(businessId: number, toPhone: string, text: string): Promise<void> {
+  const entry = sessions.get(businessId);
+  if (!entry || entry.status !== "connected") {
+    throw new Error(`No active QR session for business ${businessId}`);
+  }
+  const sock = entry.socket as { sendMessage: (jid: string, content: { text: string }) => Promise<unknown> };
+  const jid = `${toPhone}@s.whatsapp.net`;
+  await sock.sendMessage(jid, { text });
+}
+
 export async function restoreActiveSessions(): Promise<void> {
   try {
     const businesses = await db

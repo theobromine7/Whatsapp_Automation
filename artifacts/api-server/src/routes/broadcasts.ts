@@ -61,7 +61,13 @@ router.post("/businesses/:id/broadcasts", async (req, res): Promise<void> => {
   }
 
   const [business] = await db
-    .select()
+    .select({
+      id: businessesTable.id,
+      name: businessesTable.name,
+      connectionType: businessesTable.connectionType,
+      whatsappPhoneNumberId: businessesTable.whatsappPhoneNumberId,
+      whatsappAccessToken: businessesTable.whatsappAccessToken,
+    })
     .from(businessesTable)
     .where(eq(businessesTable.id, id));
 

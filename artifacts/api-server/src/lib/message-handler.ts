@@ -15,6 +15,7 @@ export async function handleIncomingMessage(opts: {
 }): Promise<void> {
   const { business, customerPhone, customerName, messageText, whatsappMessageId, sendReply } = opts;
 
+  // Upsert conversation — create if first contact, update name if newly known
   let [conversation] = await db
     .select()
     .from(whatsappConversationsTable)
@@ -38,6 +39,7 @@ export async function handleIncomingMessage(opts: {
       .where(eq(whatsappConversationsTable.id, conversation.id));
   }
 
+  // Save the incoming customer message
   await db.insert(whatsappMessagesTable).values({
     conversationId: conversation.id,
     role: "user",
@@ -45,18 +47,27 @@ export async function handleIncomingMessage(opts: {
     whatsappMessageId: whatsappMessageId ?? null,
   });
 
-  const aiResponse = await generateAIResponse(business, conversation.id, messageText);
+  // Mark conversation as active NOW — before AI generation so the contact
+  // stays "recent" even if the AI call fails (e.g. rate limits)
+  await db
+    .update(whatsappConversationsTable)
+    .set({ updatedAt: new Date() })
+    .where(eq(whatsappConversationsTable.id, conversation.id));
+
+  // Generate AI response — fall back to a friendly message on error
+  let aiResponse: string;
+  try {
+    aiResponse = await generateAIResponse(business, conversation.id, messageText);
+  } catch (err) {
+    logger.error({ err, businessId: business.id }, "AI response generation failed");
+    aiResponse = "Thanks for your message! We're experiencing a brief technical issue and will get back to you shortly.";
+  }
 
   await db.insert(whatsappMessagesTable).values({
     conversationId: conversation.id,
     role: "assistant",
     content: aiResponse,
   });
-
-  await db
-    .update(whatsappConversationsTable)
-    .set({ updatedAt: new Date() })
-    .where(eq(whatsappConversationsTable.id, conversation.id));
 
   await sendReply(aiResponse);
 

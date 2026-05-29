@@ -163,9 +163,13 @@ export async function startSession(businessId: number): Promise<void> {
     for (const msg of messages) {
       if (!msg.message || msg.key.fromMe) continue;
       const jid = msg.key.remoteJid;
-      if (!jid || jid.endsWith("@g.us")) continue; // skip group messages
+      // Only handle real 1-on-1 user messages — skip groups (@g.us),
+      // newsletters (@newsletter), linked-ID system accounts (@lid),
+      // and anything else that isn't a plain WhatsApp user (@s.whatsapp.net)
+      if (!jid || !jid.endsWith("@s.whatsapp.net")) continue;
 
-      const senderPhone = jid.split("@")[0];
+      // Strip optional multi-device suffix (e.g. "919140600553:5@s.whatsapp.net" → "919140600553")
+      const senderPhone = jid.split("@")[0].split(":")[0];
       const text =
         msg.message.conversation ||
         msg.message.extendedTextMessage?.text ||

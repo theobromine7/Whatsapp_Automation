@@ -83,7 +83,18 @@ export async function startSession(businessId: number): Promise<void> {
     auth: state,
     printQRInTerminal: false,
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    logger: { level: "silent", trace: () => {}, debug: () => {}, info: () => {}, warn: () => {}, error: () => {}, fatal: () => {}, child: () => ({ level: "silent", trace: () => {}, debug: () => {}, info: () => {}, warn: () => {}, error: () => {}, fatal: () => {}, child: () => ({}) }) } as any,
+    logger: {
+      level: "warn",
+      trace: () => {}, debug: () => {}, info: () => {},
+      warn:  (obj: unknown, msg?: string) => logger.warn({ baileys: obj }, msg ?? "Baileys warn"),
+      error: (obj: unknown, msg?: string) => logger.error({ baileys: obj }, msg ?? "Baileys error"),
+      fatal: (obj: unknown, msg?: string) => logger.error({ baileys: obj }, msg ?? "Baileys fatal"),
+      child: () => ({ level: "warn", trace: () => {}, debug: () => {}, info: () => {},
+        warn:  (o: unknown, m?: string) => logger.warn({ baileys: o }, m ?? "Baileys warn"),
+        error: (o: unknown, m?: string) => logger.error({ baileys: o }, m ?? "Baileys error"),
+        fatal: (o: unknown, m?: string) => logger.error({ baileys: o }, m ?? "Baileys fatal"),
+        child: () => ({}) }),
+    } as any,
     browser: ["NexusAgent", "Chrome", "1.0.0"],
     syncFullHistory: false,
   });

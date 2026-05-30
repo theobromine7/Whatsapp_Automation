@@ -25,6 +25,13 @@ export const businessesTable = pgTable("businesses", {
   sessionStatus: text("session_status"), // 'pending' | 'connected' | 'disconnected'
   connectedPhone: text("connected_phone"),
 
+  // Advize Firebase store linkage
+  firebaseUid: text("firebase_uid"),       // owner_id from Firestore stores collection
+  upiId: text("upi_id"),                   // upi_id from Firestore store doc
+  storeSlug: text("store_slug"),           // slug from Firestore store doc
+  storeName: text("store_name"),           // store display name from Firestore
+  lastSyncedAt: timestamp("last_synced_at", { withTimezone: true }),
+
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow().$onUpdate(() => new Date()),
 });

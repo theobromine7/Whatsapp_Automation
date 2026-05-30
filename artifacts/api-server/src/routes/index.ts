@@ -8,6 +8,7 @@ import testConnectionRouter from "./test-connection";
 import sessionsRouter from "./sessions";
 import knowledgeRouter from "./knowledge";
 import broadcastsRouter from "./broadcasts";
+import firebaseSyncRouter from "./firebase-sync";
 
 const router: IRouter = Router();
 
@@ -20,5 +21,6 @@ router.use(testConnectionRouter);
 router.use(sessionsRouter);
 router.use(knowledgeRouter);
 router.use(broadcastsRouter);
+router.use(firebaseSyncRouter);
 
 export default router;

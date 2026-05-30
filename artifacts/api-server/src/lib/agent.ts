@@ -4,11 +4,24 @@ import { eq, sql } from "drizzle-orm";
 import { logger } from "./logger";
 import type { Business } from "@workspace/db";
 
+const PURCHASE_INTENT_KEYWORDS = [
+  "buy", "purchase", "order", "payment", "pay", "how much", "price", "cost",
+  "checkout", "want to get", "want to buy", "i'll take", "i want", "book",
+  "खरीदना", "खरीदें", "ऑर्डर", "भुगतान", "कीमत", "order karna", "khareedna",
+];
+
+export interface AIResponseResult {
+  text: string;
+  purchaseIntent: boolean;
+  detectedProductName?: string;
+  detectedProductPrice?: number;
+}
+
 export async function generateAIResponse(
   business: Business,
   conversationId: number,
   customerMessage: string
-): Promise<string> {
+): Promise<AIResponseResult> {
   const systemPrompt = buildSystemPrompt(business);
 
   const history = await db
@@ -27,34 +40,57 @@ export async function generateAIResponse(
     parts: [{ text: customerMessage }],
   });
 
-  const ragContext = await retrieveRelevantChunks(business.id, customerMessage);
+  const { ragContext, topProduct } = await retrieveRelevantChunks(business.id, customerMessage);
 
   const fullSystemPrompt = ragContext
     ? `${systemPrompt}\n\n${ragContext}`
     : systemPrompt;
+
+  // Add UPI payment instructions to system prompt if store has UPI configured
+  const paymentPrompt = business.upiId
+    ? `\n\nPAYMENT: If a customer wants to buy something, tell them you will send them a payment QR code. UPI ID: ${business.upiId}`
+    : "";
 
   try {
     const response = await ai.models.generateContent({
       model: "gemini-2.5-flash",
       contents: chatHistory,
       config: {
-        systemInstruction: fullSystemPrompt,
+        systemInstruction: fullSystemPrompt + paymentPrompt,
         maxOutputTokens: 8192,
       },
     });
 
-    return response.text ?? "I'm sorry, I couldn't generate a response. Please try again.";
+    const text = response.text ?? "I'm sorry, I couldn't generate a response. Please try again.";
+
+    // Detect purchase intent
+    const msgLower = customerMessage.toLowerCase();
+    const purchaseIntent =
+      !!business.upiId &&
+      PURCHASE_INTENT_KEYWORDS.some((kw) => msgLower.includes(kw));
+
+    return {
+      text,
+      purchaseIntent,
+      detectedProductName: topProduct?.name,
+      detectedProductPrice: topProduct?.price,
+    };
   } catch (error) {
     logger.error({ error, businessId: business.id }, "Gemini API error");
     throw error;
   }
 }
 
+interface TopProduct {
+  name: string;
+  price: number;
+}
+
 async function retrieveRelevantChunks(
   businessId: number,
   query: string,
-  topK = 3
-): Promise<string | null> {
+  topK = 4
+): Promise<{ ragContext: string | null; topProduct: TopProduct | null }> {
   try {
     const chunks = await db
       .select({ id: knowledgeChunksTable.id })
@@ -62,7 +98,7 @@ async function retrieveRelevantChunks(
       .where(eq(knowledgeChunksTable.businessId, businessId))
       .limit(1);
 
-    if (chunks.length === 0) return null;
+    if (chunks.length === 0) return { ragContext: null, topProduct: null };
 
     const queryEmbedding = await embedText(query);
     const embeddingLiteral = `[${queryEmbedding.join(",")}]`;
@@ -85,19 +121,37 @@ async function retrieveRelevantChunks(
       similarity: number;
     }>;
 
-    if (rows.length === 0) return null;
+    if (rows.length === 0) return { ragContext: null, topProduct: null };
 
-    const relevant = rows.filter((r) => r.similarity > 0.4);
-    if (relevant.length === 0) return null;
+    const relevant = rows.filter((r) => r.similarity > 0.35);
+    if (relevant.length === 0) return { ragContext: null, topProduct: null };
 
     const contextBlock = relevant
       .map((r) => `[${r.source_type.toUpperCase()}] ${r.title}:\n${r.content}`)
       .join("\n\n---\n\n");
 
-    return `RELEVANT KNOWLEDGE BASE (use this to answer accurately):\n\n${contextBlock}`;
+    // Extract product name/price from the top firebase_product chunk
+    let topProduct: TopProduct | null = null;
+    const productChunk = relevant.find((r) =>
+      r.source_type === "firebase_product" || r.source_type === "product"
+    );
+    if (productChunk) {
+      const priceMatch = productChunk.content.match(/Price:\s*₹(\d+(?:\.\d+)?)/);
+      if (priceMatch) {
+        topProduct = {
+          name: productChunk.title,
+          price: parseFloat(priceMatch[1]!),
+        };
+      }
+    }
+
+    return {
+      ragContext: `RELEVANT KNOWLEDGE BASE (use this to answer accurately):\n\n${contextBlock}`,
+      topProduct,
+    };
   } catch (err) {
     logger.warn({ err, businessId }, "RAG retrieval failed, proceeding without context");
-    return null;
+    return { ragContext: null, topProduct: null };
   }
 }
 
@@ -114,7 +168,8 @@ IMPORTANT GUIDELINES:
 - If asked about something outside your knowledge, say so politely
 - Keep responses concise and conversational (suitable for WhatsApp)
 - Do not use markdown formatting — plain text only
-- Always try to move customers towards making a purchase or booking`;
+- Always try to move customers towards making a purchase or booking
+- When sharing product links, always include the full URL so customers can click it`;
 
   if (business.products) {
     prompt += `\n\nOUR PRODUCTS/SERVICES:\n${business.products}`;

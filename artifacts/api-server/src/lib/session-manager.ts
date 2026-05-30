@@ -196,12 +196,13 @@ export async function startSession(businessId: number): Promise<void> {
     for (const msg of messages) {
       if (!msg.message || msg.key.fromMe) continue;
       const jid = msg.key.remoteJid;
-      // Only handle real 1-on-1 user messages — skip groups (@g.us),
-      // newsletters (@newsletter), linked-ID system accounts (@lid),
-      // and anything else that isn't a plain WhatsApp user (@s.whatsapp.net)
-      if (!jid || !jid.endsWith("@s.whatsapp.net")) continue;
+      // Accept real 1-on-1 messages: standard @s.whatsapp.net and newer
+      // privacy-preserving @lid JIDs. Skip groups (@g.us) and newsletters (@newsletter).
+      if (!jid || (!jid.endsWith("@s.whatsapp.net") && !jid.endsWith("@lid"))) continue;
 
-      // Strip optional multi-device suffix (e.g. "919140600553:5@s.whatsapp.net" → "919140600553")
+      // Strip domain and optional multi-device suffix
+      // e.g. "919140600553:5@s.whatsapp.net" → "919140600553"
+      // e.g. "173237656879273@lid" → "173237656879273"
       const senderPhone = jid.split("@")[0].split(":")[0];
       const text =
         msg.message.conversation ||

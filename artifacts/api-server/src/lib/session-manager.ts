@@ -18,6 +18,7 @@ interface SessionEntry {
   status: "connecting" | "connected" | "disconnected";
   qrDataUrl: string | null;
   connectedPhone: string | null;
+  connectAttempts: number;
 }
 
 const sessions = new Map<number, SessionEntry>();
@@ -54,12 +55,14 @@ export async function startSession(businessId: number): Promise<void> {
   clearRestartTimer(businessId);
   await stopSession(businessId);
 
+  const existing = sessions.get(businessId);
   const entry: SessionEntry = {
     socket: null,
-    sseClients: new Set(),
+    sseClients: existing?.sseClients ?? new Set(),
     status: "connecting",
     qrDataUrl: null,
     connectedPhone: null,
+    connectAttempts: (existing?.connectAttempts ?? 0) + 1,
   };
   sessions.set(businessId, entry);
 
@@ -129,12 +132,27 @@ export async function startSession(businessId: number): Promise<void> {
         const timer = setTimeout(() => startSession(businessId), 5000);
         restartTimers.set(businessId, timer);
       } else {
-        // Was still in QR-scan phase — retry quietly so the QR panel can pick up the new code
-        entry.status = "connecting";
-        entry.qrDataUrl = null;
-        broadcastToSSE(businessId, { type: "reconnecting" });
-        const timer = setTimeout(() => startSession(businessId), 3000);
-        restartTimers.set(businessId, timer);
+        // Was still in QR-scan phase
+        if (entry.connectAttempts >= 5) {
+          // Too many failed attempts — stale credentials. Clear them and stop.
+          const dir = getSessionDir(businessId);
+          fs.rmSync(dir, { recursive: true, force: true });
+          entry.status = "disconnected";
+          await db
+            .update(businessesTable)
+            .set({ sessionStatus: "disconnected", connectedPhone: null, updatedAt: new Date() })
+            .where(eq(businessesTable.id, businessId));
+          broadcastToSSE(businessId, { type: "disconnected", reason: "auth_failed" });
+          sessions.delete(businessId);
+          logger.warn({ businessId }, "QR session failed too many times — cleared stale credentials");
+        } else {
+          // Retry so the QR panel can pick up a fresh QR code
+          entry.status = "connecting";
+          entry.qrDataUrl = null;
+          broadcastToSSE(businessId, { type: "reconnecting" });
+          const timer = setTimeout(() => startSession(businessId), 3000);
+          restartTimers.set(businessId, timer);
+        }
       }
     }
 
@@ -144,6 +162,7 @@ export async function startSession(businessId: number): Promise<void> {
       entry.status = "connected";
       entry.connectedPhone = phone;
       entry.qrDataUrl = null;
+      entry.connectAttempts = 0; // reset on success
 
       await db
         .update(businessesTable)

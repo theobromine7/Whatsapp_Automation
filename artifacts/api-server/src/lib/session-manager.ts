@@ -188,6 +188,9 @@ export async function startSession(businessId: number): Promise<void> {
   sock.ev.on("creds.update", saveCreds);
 
   sock.ev.on("messages.upsert", async ({ messages, type }) => {
+    // Diagnostic: log every upsert event so we can see what Baileys receives
+    logger.info({ businessId, type, count: messages.length, jids: messages.map(m => m.key.remoteJid) }, "messages.upsert received");
+
     if (type !== "notify") return;
 
     for (const msg of messages) {

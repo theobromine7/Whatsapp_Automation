@@ -1,7 +1,7 @@
 import { Router, type IRouter } from "express";
 import { eq } from "drizzle-orm";
 import { db, businessesTable } from "@workspace/db";
-import { handleIncomingMessage, findBusinessByMetaPhoneId, metaSendReply } from "../lib/message-handler";
+import { handleIncomingMessage, findBusinessByMetaPhoneId, metaSendReply, metaSendImage } from "../lib/message-handler";
 import { logger } from "../lib/logger";
 
 const router: IRouter = Router();
@@ -73,6 +73,7 @@ router.post("/whatsapp/webhook", async (req, res): Promise<void> => {
             messageText,
             whatsappMessageId,
             sendReply: (text) => metaSendReply(business, customerPhone, text),
+            sendImage: (buf, caption) => metaSendImage(business, customerPhone, buf, caption),
           });
         }
       }

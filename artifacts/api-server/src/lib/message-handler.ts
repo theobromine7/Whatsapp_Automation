@@ -1,7 +1,8 @@
 import { eq, and } from "drizzle-orm";
 import { db, businessesTable, whatsappConversationsTable, whatsappMessagesTable } from "@workspace/db";
 import { generateAIResponse } from "./agent";
-import { sendWhatsappMessage } from "./whatsapp";
+import { sendWhatsappMessage, sendWhatsappImage } from "./whatsapp";
+import { generateUpiQr } from "./upi";
 import { logger } from "./logger";
 import type { Business } from "@workspace/db";
 
@@ -13,10 +14,11 @@ export async function handleIncomingMessage(opts: {
   messageText: string;
   whatsappMessageId?: string;
   sendReply: (text: string) => Promise<void>;
+  sendImage?: (imageBuffer: Buffer, caption?: string) => Promise<void>;
 }): Promise<void> {
-  const { business, customerPhone, customerJid, customerName, messageText, whatsappMessageId, sendReply } = opts;
+  const { business, customerPhone, customerJid, customerName, messageText, whatsappMessageId, sendReply, sendImage } = opts;
 
-  // Upsert conversation — create if first contact, update name/jid if newly known
+  // Upsert conversation
   let [conversation] = await db
     .select()
     .from(whatsappConversationsTable)
@@ -45,7 +47,7 @@ export async function handleIncomingMessage(opts: {
     }
   }
 
-  // Save the incoming customer message
+  // Save incoming customer message
   await db.insert(whatsappMessagesTable).values({
     conversationId: conversation.id,
     role: "user",
@@ -53,29 +55,67 @@ export async function handleIncomingMessage(opts: {
     whatsappMessageId: whatsappMessageId ?? null,
   });
 
-  // Mark conversation as active NOW — before AI generation so the contact
-  // stays "recent" even if the AI call fails (e.g. rate limits)
+  // Mark conversation as active
   await db
     .update(whatsappConversationsTable)
     .set({ updatedAt: new Date() })
     .where(eq(whatsappConversationsTable.id, conversation.id));
 
-  // Generate AI response — fall back to a friendly message on error
-  let aiResponse: string;
+  // Generate AI response
+  let aiResult: Awaited<ReturnType<typeof generateAIResponse>>;
   try {
-    aiResponse = await generateAIResponse(business, conversation.id, messageText);
+    aiResult = await generateAIResponse(business, conversation.id, messageText);
   } catch (err) {
     logger.error({ err, businessId: business.id }, "AI response generation failed");
-    aiResponse = "Thanks for your message! We're experiencing a brief technical issue and will get back to you shortly.";
+    const fallback = "Thanks for your message! We're experiencing a brief technical issue and will get back to you shortly.";
+    await db.insert(whatsappMessagesTable).values({ conversationId: conversation.id, role: "assistant", content: fallback });
+    await sendReply(fallback);
+    return;
   }
 
+  // Save AI text response
   await db.insert(whatsappMessagesTable).values({
     conversationId: conversation.id,
     role: "assistant",
-    content: aiResponse,
+    content: aiResult.text,
   });
 
-  await sendReply(aiResponse);
+  await sendReply(aiResult.text);
+
+  // If purchase intent detected and store has UPI, send QR code
+  if (aiResult.purchaseIntent && business.upiId && business.storeName) {
+    try {
+      const qrBuffer = await generateUpiQr({
+        upiId: business.upiId,
+        payeeName: business.storeName,
+        amount: aiResult.detectedProductPrice,
+        note: aiResult.detectedProductName
+          ? `Payment for ${aiResult.detectedProductName}`
+          : "Payment",
+      });
+
+      const caption = aiResult.detectedProductPrice
+        ? `Scan to pay ₹${aiResult.detectedProductPrice} for ${aiResult.detectedProductName ?? "your order"}`
+        : `Scan to pay — ${business.storeName}`;
+
+      if (sendImage) {
+        await sendImage(qrBuffer, caption);
+        logger.info({ businessId: business.id, customerPhone }, "UPI QR sent");
+      } else {
+        // Fallback: for QR session we can't send images easily, send text UPI link
+        const { buildUpiLink } = await import("./upi");
+        const link = buildUpiLink({
+          upiId: business.upiId,
+          payeeName: business.storeName,
+          amount: aiResult.detectedProductPrice,
+          note: aiResult.detectedProductName ? `Payment for ${aiResult.detectedProductName}` : "Payment",
+        });
+        await sendReply(`💳 Pay via UPI: ${link}`);
+      }
+    } catch (err) {
+      logger.warn({ err, businessId: business.id }, "Failed to send UPI QR — skipping");
+    }
+  }
 
   logger.info(
     { businessId: business.id, conversationId: conversation.id, customerPhone },
@@ -114,4 +154,11 @@ export async function metaSendReply(business: Business, to: string, text: string
     throw new Error("Business does not have Meta Cloud API credentials");
   }
   await sendWhatsappMessage(business.whatsappPhoneNumberId, business.whatsappAccessToken, to, text);
+}
+
+export async function metaSendImage(business: Business, to: string, imageBuffer: Buffer, caption?: string): Promise<void> {
+  if (!business.whatsappPhoneNumberId || !business.whatsappAccessToken) {
+    throw new Error("Business does not have Meta Cloud API credentials");
+  }
+  await sendWhatsappImage(business.whatsappPhoneNumberId, business.whatsappAccessToken, to, imageBuffer, caption);
 }

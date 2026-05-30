@@ -34,12 +34,14 @@ import {
   Pencil,
   Save,
   X,
+  Store,
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { KnowledgeTab } from "./knowledge-tab";
 import { ContactsTab } from "./contacts-tab";
+import { FirebaseSyncTab } from "./firebase-sync-tab";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
@@ -480,12 +482,15 @@ export default function BusinessDetail() {
 
       {/* Main tabs */}
       <Tabs defaultValue={isConnected ? "conversations" : "connect"} className="w-full">
-        <TabsList className="grid w-full grid-cols-5 max-w-2xl">
+        <TabsList className="grid w-full grid-cols-6 max-w-3xl">
           <TabsTrigger value="connect" className="gap-1.5">
             <Link2 className="w-3.5 h-3.5" /> Connect
           </TabsTrigger>
           <TabsTrigger value="conversations" className="gap-1.5">
             <MessageSquare className="w-3.5 h-3.5" /> Chats
+          </TabsTrigger>
+          <TabsTrigger value="store" className="gap-1.5">
+            <Store className="w-3.5 h-3.5" /> Store
           </TabsTrigger>
           <TabsTrigger value="knowledge" className="gap-1.5">
             <BarChart3 className="w-3.5 h-3.5" /> Knowledge
@@ -619,6 +624,11 @@ export default function BusinessDetail() {
               )}
             </CardContent>
           </Card>
+        </TabsContent>
+
+        {/* ── Store Sync Tab ── */}
+        <TabsContent value="store" className="pt-4">
+          <FirebaseSyncTab businessId={businessId} />
         </TabsContent>
 
         {/* ── Knowledge Tab ── */}

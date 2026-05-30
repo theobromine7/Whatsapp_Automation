@@ -8,14 +8,15 @@ import type { Business } from "@workspace/db";
 export async function handleIncomingMessage(opts: {
   business: Business;
   customerPhone: string;
+  customerJid?: string;
   customerName: string | null;
   messageText: string;
   whatsappMessageId?: string;
   sendReply: (text: string) => Promise<void>;
 }): Promise<void> {
-  const { business, customerPhone, customerName, messageText, whatsappMessageId, sendReply } = opts;
+  const { business, customerPhone, customerJid, customerName, messageText, whatsappMessageId, sendReply } = opts;
 
-  // Upsert conversation — create if first contact, update name if newly known
+  // Upsert conversation — create if first contact, update name/jid if newly known
   let [conversation] = await db
     .select()
     .from(whatsappConversationsTable)
@@ -29,14 +30,19 @@ export async function handleIncomingMessage(opts: {
   if (!conversation) {
     const [newConv] = await db
       .insert(whatsappConversationsTable)
-      .values({ businessId: business.id, customerPhone, customerName })
+      .values({ businessId: business.id, customerPhone, customerJid: customerJid ?? null, customerName })
       .returning();
     conversation = newConv!;
-  } else if (customerName && !conversation.customerName) {
-    await db
-      .update(whatsappConversationsTable)
-      .set({ customerName, updatedAt: new Date() })
-      .where(eq(whatsappConversationsTable.id, conversation.id));
+  } else {
+    const updates: Record<string, unknown> = { updatedAt: new Date() };
+    if (customerName && !conversation.customerName) updates.customerName = customerName;
+    if (customerJid && !conversation.customerJid) updates.customerJid = customerJid;
+    if (Object.keys(updates).length > 1 || !conversation.customerName) {
+      await db
+        .update(whatsappConversationsTable)
+        .set(updates)
+        .where(eq(whatsappConversationsTable.id, conversation.id));
+    }
   }
 
   // Save the incoming customer message

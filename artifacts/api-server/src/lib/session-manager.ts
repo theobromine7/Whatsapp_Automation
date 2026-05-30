@@ -224,6 +224,7 @@ export async function startSession(businessId: number): Promise<void> {
         await handleIncomingMessage({
           business,
           customerPhone: senderPhone,
+          customerJid: jid,
           customerName: pushName,
           messageText: text,
           sendReply: async (replyText) => {
@@ -288,13 +289,15 @@ export function getSessionStatus(businessId: number): { status: string; connecte
   return { status: entry.status, connectedPhone: entry.connectedPhone };
 }
 
-export async function sendMessageViaSession(businessId: number, toPhone: string, text: string): Promise<void> {
+export async function sendMessageViaSession(businessId: number, toJidOrPhone: string, text: string): Promise<void> {
   const entry = sessions.get(businessId);
   if (!entry || entry.status !== "connected") {
     throw new Error(`No active QR session for business ${businessId}`);
   }
   const sock = entry.socket as { sendMessage: (jid: string, content: { text: string }) => Promise<unknown> };
-  const jid = `${toPhone}@s.whatsapp.net`;
+  // Accept a full JID (e.g. "173237656879273@lid" or "919140600553@s.whatsapp.net")
+  // or a bare phone number (falls back to @s.whatsapp.net)
+  const jid = toJidOrPhone.includes("@") ? toJidOrPhone : `${toJidOrPhone}@s.whatsapp.net`;
   await sock.sendMessage(jid, { text });
 }
 

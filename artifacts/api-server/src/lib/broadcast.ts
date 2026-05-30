@@ -19,7 +19,10 @@ export async function broadcastToRecentCustomers(
   threeMonthsAgo.setMonth(threeMonthsAgo.getMonth() - 3);
 
   const customers = await db
-    .selectDistinct({ customerPhone: whatsappConversationsTable.customerPhone })
+    .selectDistinct({
+      customerPhone: whatsappConversationsTable.customerPhone,
+      customerJid: whatsappConversationsTable.customerJid,
+    })
     .from(whatsappConversationsTable)
     .where(
       and(
@@ -30,10 +33,12 @@ export async function broadcastToRecentCustomers(
 
   let sent = 0;
 
-  for (const { customerPhone } of customers) {
+  for (const { customerPhone, customerJid } of customers) {
     try {
       if (business.connectionType === "qr_session") {
-        await sendMessageViaSession(business.id, customerPhone, message);
+        // Use the stored JID if available (preserves @lid for newer WhatsApp accounts);
+        // fall back to the phone number which sendMessageViaSession appends @s.whatsapp.net to
+        await sendMessageViaSession(business.id, customerJid ?? customerPhone, message);
         sent++;
       } else if (
         business.connectionType === "meta_cloud" &&

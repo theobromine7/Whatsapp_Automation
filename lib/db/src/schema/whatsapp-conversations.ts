@@ -7,6 +7,7 @@ export const whatsappConversationsTable = pgTable("whatsapp_conversations", {
   id: serial("id").primaryKey(),
   businessId: integer("business_id").notNull().references(() => businessesTable.id, { onDelete: "cascade" }),
   customerPhone: text("customer_phone").notNull(),
+  customerJid: text("customer_jid"),
   customerName: text("customer_name"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow().$onUpdate(() => new Date()),

@@ -10,7 +10,7 @@ import { cn } from "@/lib/utils";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 
 const NAV = [
-  { href: "/", icon: MessageSquare, label: "Inbox" },
+  { href: "/inbox", icon: MessageSquare, label: "Inbox" },
   { href: "/dashboard", icon: LayoutDashboard, label: "Dashboard" },
   { href: "/businesses", icon: Building2, label: "Businesses" },
   { href: "/businesses/new", icon: PlusCircle, label: "Add Business" },
@@ -20,7 +20,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
   const [location] = useLocation();
 
   const isActive = (href: string) => {
-    if (href === "/") return location === "/";
+    if (href === "/inbox") return location === "/inbox" || location === "/";
     if (href === "/businesses") return location === "/businesses" || (location.startsWith("/businesses/") && location !== "/businesses/new");
     return location.startsWith(href);
   };

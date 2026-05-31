@@ -109,6 +109,10 @@ router.post("/businesses/:id/firebase-sync", async (req, res): Promise<void> => 
       );
 
     // Insert store info chunk
+    const storeUrl = store.slug
+      ? `${STORE_DOMAIN}/store/${store.slug}`
+      : STORE_DOMAIN;
+
     const storeContent = [
       `Store: ${store.name}`,
       store.category ? `Category: ${store.category}` : null,
@@ -116,7 +120,7 @@ router.post("/businesses/:id/firebase-sync", async (req, res): Promise<void> => 
       store.delivery_charge ? `Delivery charge: ₹${store.delivery_charge}` : null,
       store.terms_and_conditions ? `Terms: ${store.terms_and_conditions}` : null,
       store.upi_id ? `UPI Payment ID: ${store.upi_id}` : null,
-      `Store URL: ${STORE_DOMAIN}`,
+      `Store URL: ${storeUrl}`,
     ].filter(Boolean).join("\n");
 
     let storeEmbedding: number[] | undefined;

@@ -189,8 +189,12 @@ IMPORTANT GUIDELINES:
 - Keep responses concise and conversational (suitable for WhatsApp)
 - Do not use markdown formatting — plain text only
 - Always try to move customers towards making a purchase or booking
-- When sharing product links, ONLY use links from the RELEVANT KNOWLEDGE BASE section below — never invent or guess URLs
-- If you do not have a product link in the knowledge base, do NOT share any URL at all`;
+- When sharing product links, ONLY use links from the PRODUCT KNOWLEDGE BASE section — never invent or guess URLs
+- If you do not have a product link in the knowledge base, do NOT share any URL at all${
+  business.storeSlug
+    ? `\n- When a customer asks to see all products or browse the full range, share the store page: https://store.advize.in/store/${business.storeSlug}`
+    : ""
+}`;
 
   if (business.products) {
     prompt += `\n\nOUR PRODUCTS/SERVICES:\n${business.products}`;

@@ -169,7 +169,8 @@ IMPORTANT GUIDELINES:
 - Keep responses concise and conversational (suitable for WhatsApp)
 - Do not use markdown formatting — plain text only
 - Always try to move customers towards making a purchase or booking
-- When sharing product links, always include the full URL so customers can click it`;
+- When sharing product links, ONLY use links from the RELEVANT KNOWLEDGE BASE section below — never invent or guess URLs
+- If you do not have a product link in the knowledge base, do NOT share any URL at all`;
 
   if (business.products) {
     prompt += `\n\nOUR PRODUCTS/SERVICES:\n${business.products}`;

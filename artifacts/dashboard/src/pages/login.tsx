@@ -1,11 +1,13 @@
 import { useState } from "react";
-import { Link, useLocation } from "wouter";
+import { Link, useLocation, useSearch } from "wouter";
 import { MessageCircle, Loader2, LogIn } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { loginWithEmail, loginWithGoogle } from "@/lib/firebase";
 
 export default function Login() {
   const [, setLocation] = useLocation();
+  const search = useSearch();
+  const redirectTo = new URLSearchParams(search).get("from") ?? "/inbox";
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
@@ -18,7 +20,7 @@ export default function Login() {
     setLoading(true);
     try {
       await loginWithEmail(email, password);
-      setLocation("/inbox");
+      setLocation(redirectTo);
     } catch (err: unknown) {
       setError(friendlyError((err as Error).message));
     } finally {
@@ -31,7 +33,7 @@ export default function Login() {
     setGoogleLoading(true);
     try {
       await loginWithGoogle();
-      setLocation("/inbox");
+      setLocation(redirectTo);
     } catch (err: unknown) {
       setError(friendlyError((err as Error).message));
     } finally {

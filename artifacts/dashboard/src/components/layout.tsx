@@ -5,9 +5,12 @@ import {
   Building2,
   PlusCircle,
   Zap,
+  LogOut,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { useAuth } from "@/contexts/AuthContext";
+import { logout } from "@/lib/firebase";
 
 const NAV = [
   { href: "/inbox", icon: MessageSquare, label: "Inbox" },
@@ -18,12 +21,17 @@ const NAV = [
 
 export function Layout({ children }: { children: React.ReactNode }) {
   const [location] = useLocation();
+  const { user } = useAuth();
 
   const isActive = (href: string) => {
     if (href === "/inbox") return location === "/inbox" || location === "/";
     if (href === "/businesses") return location === "/businesses" || (location.startsWith("/businesses/") && location !== "/businesses/new");
     return location.startsWith(href);
   };
+
+  const initials = user?.displayName
+    ? user.displayName.split(" ").map((n) => n[0]).join("").slice(0, 2).toUpperCase()
+    : user?.email?.[0]?.toUpperCase() ?? "?";
 
   return (
     <div className="flex h-screen w-full overflow-hidden bg-background">
@@ -58,8 +66,36 @@ export function Layout({ children }: { children: React.ReactNode }) {
           ))}
         </div>
 
-        <div className="w-9 h-9 rounded-full bg-[#2a3942] border border-[#3a4a54] flex items-center justify-center shrink-0">
-          <span className="text-[#8696a0] text-xs font-bold">N</span>
+        {/* User avatar + logout */}
+        <div className="flex flex-col items-center gap-2 mt-2">
+          <Tooltip delayDuration={0}>
+            <TooltipTrigger asChild>
+              <button
+                onClick={() => logout()}
+                className="w-9 h-9 rounded-full bg-[#2a3942] border border-[#3a4a54] flex items-center justify-center text-[#8696a0] hover:bg-red-900/40 hover:text-red-400 hover:border-red-800 transition-all shrink-0"
+              >
+                <LogOut className="w-4 h-4" />
+              </button>
+            </TooltipTrigger>
+            <TooltipContent side="right" className="font-medium text-xs">
+              Sign out
+            </TooltipContent>
+          </Tooltip>
+
+          <Tooltip delayDuration={0}>
+            <TooltipTrigger asChild>
+              <div className="w-9 h-9 rounded-full bg-primary/20 border border-primary/30 flex items-center justify-center shrink-0">
+                {user?.photoURL ? (
+                  <img src={user.photoURL} alt="avatar" className="w-9 h-9 rounded-full object-cover" />
+                ) : (
+                  <span className="text-primary text-xs font-bold">{initials}</span>
+                )}
+              </div>
+            </TooltipTrigger>
+            <TooltipContent side="right" className="font-medium text-xs">
+              {user?.displayName ?? user?.email ?? "Account"}
+            </TooltipContent>
+          </Tooltip>
         </div>
       </aside>
 

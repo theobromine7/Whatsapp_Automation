@@ -236,12 +236,12 @@ export function FirebaseSyncTab({ businessId }: FirebaseSyncTabProps) {
                 <p className="font-medium text-sm">{syncStatus.storeName}</p>
                 {syncStatus.storeSlug && (
                   <a
-                    href={`https://store.advize.in/${syncStatus.storeSlug}`}
+                    href={`https://store.advize.in/store/${syncStatus.storeSlug}`}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="text-xs text-primary underline"
                   >
-                    store.advize.in/{syncStatus.storeSlug}
+                    store.advize.in/store/{syncStatus.storeSlug}
                   </a>
                 )}
               </div>

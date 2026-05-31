@@ -9,7 +9,10 @@ if (!apiKey) {
   );
 }
 
-const embeddingClient = new GoogleGenAI({ apiKey });
+const embeddingClient = new GoogleGenAI({
+  apiKey,
+  httpOptions: { apiVersion: "v1" },
+});
 
 const EMBEDDING_MODEL = "text-embedding-004";
 const EMBEDDING_DIMENSIONS = 768;

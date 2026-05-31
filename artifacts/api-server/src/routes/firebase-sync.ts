@@ -15,6 +15,7 @@ function parseId(val: unknown): number | null {
 }
 
 function buildProductContent(p: {
+  id: string;
   name: string;
   description: string;
   price: number;
@@ -24,8 +25,7 @@ function buildProductContent(p: {
   units?: number;
 }, storeSlug: string): string {
   const effectivePrice = p.sale_price && p.sale_price < p.price ? p.sale_price : p.price;
-  const productSlug = p.name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
-  const link = `${STORE_DOMAIN}/${storeSlug}/product/${productSlug}`;
+  const link = `${STORE_DOMAIN}/${storeSlug}/product/${p.id}`;
 
   let content = `Product: ${p.name}\n`;
   content += `Price: ₹${effectivePrice}`;

@@ -26,7 +26,7 @@ interface FirebaseSyncTabProps {
 
 export function FirebaseSyncTab({ businessId }: FirebaseSyncTabProps) {
   const { toast } = useToast();
-  const [user, setUser] = useState<User | null>(auth.currentUser);
+  const [user, setUser] = useState<User | null>(null);
   const [syncStatus, setSyncStatus] = useState<SyncStatus | null>(null);
   const [syncing, setSyncing] = useState(false);
   const [loadingStatus, setLoadingStatus] = useState(true);
@@ -34,6 +34,9 @@ export function FirebaseSyncTab({ businessId }: FirebaseSyncTabProps) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loggingIn, setLoggingIn] = useState(false);
+
+  // Firebase not configured
+  const firebaseReady = auth !== null;
 
   useEffect(() => {
     const unsub = onAuthChange(setUser);
@@ -112,6 +115,21 @@ export function FirebaseSyncTab({ businessId }: FirebaseSyncTabProps) {
       <div className="flex items-center justify-center py-16">
         <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
       </div>
+    );
+  }
+
+  // Firebase API key not configured
+  if (!firebaseReady) {
+    return (
+      <Card>
+        <CardContent className="flex flex-col items-center gap-3 py-10 text-center">
+          <AlertCircle className="w-8 h-8 text-amber-500" />
+          <p className="font-medium">Firebase not configured</p>
+          <p className="text-sm text-muted-foreground max-w-xs">
+            Set the <code className="bg-muted px-1 rounded text-xs">VITE_FIREBASE_API_KEY</code> environment variable to enable Advize store sync.
+          </p>
+        </CardContent>
+      </Card>
     );
   }
 

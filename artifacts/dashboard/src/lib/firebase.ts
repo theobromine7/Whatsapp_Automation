@@ -1,4 +1,4 @@
-import { initializeApp, getApps } from "firebase/app";
+import { initializeApp, getApps, type FirebaseApp } from "firebase/app";
 import {
   getAuth,
   signInWithEmailAndPassword,
@@ -6,40 +6,50 @@ import {
   GoogleAuthProvider,
   signOut,
   onAuthStateChanged,
+  type Auth,
   type User,
 } from "firebase/auth";
 
 const apiKey = import.meta.env.VITE_FIREBASE_API_KEY as string | undefined;
 
-const firebaseConfig = {
-  apiKey: apiKey ?? "",
-  authDomain: "studio-1871371743-58ae3.firebaseapp.com",
-  projectId: "studio-1871371743-58ae3",
-  storageBucket: "studio-1871371743-58ae3.firebasestorage.app",
-};
+let _app: FirebaseApp | null = null;
+let _auth: Auth | null = null;
 
-// Only init if we have a real API key — prevents crash on missing env var
-const app = apiKey
-  ? (getApps().length ? getApps()[0]! : initializeApp(firebaseConfig))
-  : null;
+if (apiKey) {
+  const firebaseConfig = {
+    apiKey,
+    authDomain: "studio-1871371743-58ae3.firebaseapp.com",
+    projectId: "studio-1871371743-58ae3",
+    storageBucket: "studio-1871371743-58ae3.firebasestorage.app",
+  };
+  _app = getApps().length ? getApps()[0]! : initializeApp(firebaseConfig);
+  _auth = getAuth(_app);
+}
 
-export const auth = app ? getAuth(app) : null as unknown as ReturnType<typeof getAuth>;
+export const auth: Auth | null = _auth;
 export const googleProvider = new GoogleAuthProvider();
 
 export async function loginWithEmail(email: string, password: string): Promise<User> {
-  const cred = await signInWithEmailAndPassword(auth, email, password);
+  if (!_auth) throw new Error("Firebase not configured — VITE_FIREBASE_API_KEY is missing");
+  const cred = await signInWithEmailAndPassword(_auth, email, password);
   return cred.user;
 }
 
 export async function loginWithGoogle(): Promise<User> {
-  const cred = await signInWithPopup(auth, googleProvider);
+  if (!_auth) throw new Error("Firebase not configured — VITE_FIREBASE_API_KEY is missing");
+  const cred = await signInWithPopup(_auth, googleProvider);
   return cred.user;
 }
 
 export async function logout(): Promise<void> {
-  await signOut(auth);
+  if (!_auth) return;
+  await signOut(_auth);
 }
 
 export function onAuthChange(cb: (user: User | null) => void): () => void {
-  return onAuthStateChanged(auth, cb);
+  if (!_auth) {
+    cb(null);
+    return () => {};
+  }
+  return onAuthStateChanged(_auth, cb);
 }

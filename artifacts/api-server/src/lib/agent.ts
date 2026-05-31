@@ -91,68 +91,88 @@ async function retrieveRelevantChunks(
   query: string,
   topK = 4
 ): Promise<{ ragContext: string | null; topProduct: TopProduct | null }> {
-  try {
-    const chunks = await db
-      .select({ id: knowledgeChunksTable.id })
-      .from(knowledgeChunksTable)
-      .where(eq(knowledgeChunksTable.businessId, businessId))
-      .limit(1);
+  // Always load all knowledge chunks for this business
+  const allChunks = await db
+    .select({
+      id: knowledgeChunksTable.id,
+      title: knowledgeChunksTable.title,
+      content: knowledgeChunksTable.content,
+      sourceType: knowledgeChunksTable.sourceType,
+      embedding: knowledgeChunksTable.embedding,
+    })
+    .from(knowledgeChunksTable)
+    .where(eq(knowledgeChunksTable.businessId, businessId));
 
-    if (chunks.length === 0) return { ragContext: null, topProduct: null };
+  if (allChunks.length === 0) return { ragContext: null, topProduct: null };
 
-    const queryEmbedding = await embedText(query);
-    const embeddingLiteral = `[${queryEmbedding.join(",")}]`;
+  let relevant: typeof allChunks;
 
-    const results = await db.execute(sql`
-      SELECT id, title, content, source_type,
-             1 - (embedding <=> ${embeddingLiteral}::vector) AS similarity
-      FROM business_knowledge_chunks
-      WHERE business_id = ${businessId}
-        AND embedding IS NOT NULL
-      ORDER BY embedding <=> ${embeddingLiteral}::vector
-      LIMIT ${topK}
-    `);
+  // Try vector search if any chunks have embeddings
+  const hasEmbeddings = allChunks.some((c) => c.embedding !== null);
+  if (hasEmbeddings) {
+    try {
+      const queryEmbedding = await embedText(query);
+      const embeddingLiteral = `[${queryEmbedding.join(",")}]`;
 
-    const rows = results.rows as Array<{
-      id: number;
-      title: string;
-      content: string;
-      source_type: string;
-      similarity: number;
-    }>;
+      const results = await db.execute(sql`
+        SELECT id, title, content, source_type,
+               1 - (embedding <=> ${embeddingLiteral}::vector) AS similarity
+        FROM business_knowledge_chunks
+        WHERE business_id = ${businessId}
+          AND embedding IS NOT NULL
+        ORDER BY embedding <=> ${embeddingLiteral}::vector
+        LIMIT ${topK}
+      `);
 
-    if (rows.length === 0) return { ragContext: null, topProduct: null };
+      const rows = results.rows as Array<{
+        id: number; title: string; content: string;
+        source_type: string; similarity: number;
+      }>;
 
-    const relevant = rows.filter((r) => r.similarity > 0.35);
-    if (relevant.length === 0) return { ragContext: null, topProduct: null };
-
-    const contextBlock = relevant
-      .map((r) => `[${r.source_type.toUpperCase()}] ${r.title}:\n${r.content}`)
-      .join("\n\n---\n\n");
-
-    // Extract product name/price from the top firebase_product chunk
-    let topProduct: TopProduct | null = null;
-    const productChunk = relevant.find((r) =>
-      r.source_type === "firebase_product" || r.source_type === "product"
-    );
-    if (productChunk) {
-      const priceMatch = productChunk.content.match(/Price:\s*₹(\d+(?:\.\d+)?)/);
-      if (priceMatch) {
-        topProduct = {
-          name: productChunk.title,
-          price: parseFloat(priceMatch[1]!),
-        };
+      const vectorMatches = rows.filter((r) => r.similarity > 0.35);
+      if (vectorMatches.length > 0) {
+        relevant = vectorMatches.map((r) => ({
+          id: r.id, title: r.title, content: r.content,
+          sourceType: r.source_type, embedding: null,
+        }));
+      } else {
+        // Vector search returned nothing useful — fall back to all chunks
+        relevant = allChunks;
       }
+    } catch {
+      // Embedding call failed — fall back to all chunks
+      relevant = allChunks;
     }
-
-    return {
-      ragContext: `RELEVANT KNOWLEDGE BASE (use this to answer accurately):\n\n${contextBlock}`,
-      topProduct,
-    };
-  } catch (err) {
-    logger.warn({ err, businessId }, "RAG retrieval failed, proceeding without context");
-    return { ragContext: null, topProduct: null };
+  } else {
+    // No embeddings at all — inject every chunk so the AI has full product data
+    relevant = allChunks;
   }
+
+  const contextBlock = relevant
+    .map((r) => `[${r.sourceType.toUpperCase()}] ${r.title}:\n${r.content}`)
+    .join("\n\n---\n\n");
+
+  // Extract product name/price from the first product chunk
+  let topProduct: TopProduct | null = null;
+  const productChunk = relevant.find((r) =>
+    r.sourceType === "firebase_product" || r.sourceType === "product"
+  );
+  if (productChunk) {
+    const priceMatch = productChunk.content.match(/Price:\s*₹(\d+(?:\.\d+)?)/);
+    if (priceMatch) {
+      topProduct = {
+        name: productChunk.title,
+        price: parseFloat(priceMatch[1]!),
+      };
+    }
+  }
+
+  logger.info({ businessId, chunks: relevant.length, vectorSearch: hasEmbeddings }, "RAG context loaded");
+
+  return {
+    ragContext: `PRODUCT KNOWLEDGE BASE (use ONLY this data for product info and links — do not invent any URLs):\n\n${contextBlock}`,
+    topProduct,
+  };
 }
 
 function buildSystemPrompt(business: Business): string {

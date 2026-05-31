@@ -2,10 +2,12 @@ import { initializeApp, getApps, type FirebaseApp } from "firebase/app";
 import {
   getAuth,
   signInWithEmailAndPassword,
+  createUserWithEmailAndPassword,
   signInWithPopup,
   GoogleAuthProvider,
   signOut,
   onAuthStateChanged,
+  updateProfile,
   type Auth,
   type User,
 } from "firebase/auth";
@@ -32,6 +34,15 @@ export const googleProvider = new GoogleAuthProvider();
 export async function loginWithEmail(email: string, password: string): Promise<User> {
   if (!_auth) throw new Error("Firebase not configured — VITE_FIREBASE_API_KEY is missing");
   const cred = await signInWithEmailAndPassword(_auth, email, password);
+  return cred.user;
+}
+
+export async function signUpWithEmail(email: string, password: string, displayName?: string): Promise<User> {
+  if (!_auth) throw new Error("Firebase not configured — VITE_FIREBASE_API_KEY is missing");
+  const cred = await createUserWithEmailAndPassword(_auth, email, password);
+  if (displayName) {
+    await updateProfile(cred.user, { displayName });
+  }
   return cred.user;
 }
 

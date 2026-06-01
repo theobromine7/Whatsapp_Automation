@@ -61,6 +61,18 @@ export async function handleIncomingMessage(opts: {
     .set({ updatedAt: new Date() })
     .where(eq(whatsappConversationsTable.id, conversation.id));
 
+  // ── Human Takeover Guard ──────────────────────────────────────────────────
+  // Owner has manually replied in this conversation — AI stays silent until
+  // 30 minutes of owner inactivity triggers auto-resume.
+  if (conversation.aiState === "OWNER_TAKEN_OVER") {
+    logger.info(
+      { businessId: business.id, conversationId: conversation.id, customerPhone },
+      "Conversation in OWNER_TAKEN_OVER state — AI reply suppressed"
+    );
+    return;
+  }
+  // ─────────────────────────────────────────────────────────────────────────
+
   // Generate AI response
   let aiResult: Awaited<ReturnType<typeof generateAIResponse>>;
   try {
@@ -121,6 +133,42 @@ export async function handleIncomingMessage(opts: {
     { businessId: business.id, conversationId: conversation.id, customerPhone },
     "Message handled and reply sent"
   );
+}
+
+/**
+ * Called when the business owner sends a message from their WhatsApp (fromMe).
+ * Sets the conversation's aiState to OWNER_TAKEN_OVER so the AI stays silent.
+ * If no conversation exists yet (owner initiating), nothing is changed.
+ */
+export async function handleOwnerMessage(opts: {
+  business: Business;
+  customerJid: string;
+}): Promise<void> {
+  const customerPhone = opts.customerJid.split("@")[0].split(":")[0];
+
+  const [conversation] = await db
+    .select()
+    .from(whatsappConversationsTable)
+    .where(
+      and(
+        eq(whatsappConversationsTable.businessId, opts.business.id),
+        eq(whatsappConversationsTable.customerPhone, customerPhone)
+      )
+    );
+
+  if (!conversation) return;
+
+  if (conversation.aiState !== "OWNER_TAKEN_OVER") {
+    logger.info(
+      { businessId: opts.business.id, conversationId: conversation.id, customerPhone },
+      "Human takeover — AI silenced for this conversation"
+    );
+  }
+
+  await db
+    .update(whatsappConversationsTable)
+    .set({ aiState: "OWNER_TAKEN_OVER", ownerLastMessageAt: new Date() })
+    .where(eq(whatsappConversationsTable.id, conversation.id));
 }
 
 export async function findBusinessByMetaPhoneId(phoneNumberId: string): Promise<Business | null> {

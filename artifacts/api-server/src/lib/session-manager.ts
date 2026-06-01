@@ -2,7 +2,7 @@ import path from "path";
 import fs from "fs";
 import { eq } from "drizzle-orm";
 import { db, businessesTable } from "@workspace/db";
-import { handleIncomingMessage, findBusinessByConnectedPhone } from "./message-handler";
+import { handleIncomingMessage, handleOwnerMessage, findBusinessByConnectedPhone } from "./message-handler";
 import { logger } from "./logger";
 import type { Response } from "express";
 
@@ -224,11 +224,28 @@ export async function startSession(businessId: number): Promise<void> {
     if (type !== "notify") return;
 
     for (const msg of messages) {
-      if (!msg.message || msg.key.fromMe) continue;
+      if (!msg.message) continue;
       const jid = msg.key.remoteJid;
       // Accept real 1-on-1 messages: standard @s.whatsapp.net and newer
       // privacy-preserving @lid JIDs. Skip groups (@g.us) and newsletters (@newsletter).
       if (!jid || (!jid.endsWith("@s.whatsapp.net") && !jid.endsWith("@lid"))) continue;
+
+      // ── Human Takeover Detection ──────────────────────────────────────────
+      // When the owner sends a message from their phone (fromMe), silence AI
+      // for that conversation. Auto-resume kicks in after 30 min of inactivity.
+      if (msg.key.fromMe) {
+        try {
+          const customerPhone = jid.split("@")[0].split(":")[0];
+          const business = await findBusinessByConnectedPhone(entry.connectedPhone ?? customerPhone);
+          if (business) {
+            await handleOwnerMessage({ business, customerJid: jid });
+          }
+        } catch (err) {
+          logger.error({ err, businessId }, "Error handling owner takeover");
+        }
+        continue;
+      }
+      // ─────────────────────────────────────────────────────────────────────
 
       // ── Saved Contact Filter ──────────────────────────────────────────────
       // If the sender is in the owner's saved contacts, skip AI automation.

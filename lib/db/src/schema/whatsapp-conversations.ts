@@ -9,6 +9,12 @@ export const whatsappConversationsTable = pgTable("whatsapp_conversations", {
   customerPhone: text("customer_phone").notNull(),
   customerJid: text("customer_jid"),
   customerName: text("customer_name"),
+
+  // Human takeover state: 'AI_ACTIVE' (default) | 'OWNER_TAKEN_OVER'
+  aiState: text("ai_state").notNull().default("AI_ACTIVE"),
+  // When the owner last sent a message in this conversation (used for 30-min auto-resume)
+  ownerLastMessageAt: timestamp("owner_last_message_at", { withTimezone: true }),
+
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow().$onUpdate(() => new Date()),
 });

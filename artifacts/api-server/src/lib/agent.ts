@@ -1,6 +1,6 @@
 import { ai, embedText } from "@workspace/integrations-gemini-ai";
 import { db, whatsappMessagesTable, knowledgeChunksTable } from "@workspace/db";
-import { eq, sql } from "drizzle-orm";
+import { eq, sql, desc } from "drizzle-orm";
 import { logger } from "./logger";
 import type { Business } from "@workspace/db";
 
@@ -17,6 +17,9 @@ export interface AIResponseResult {
   detectedProductPrice?: number;
 }
 
+const MAX_HISTORY_MESSAGES = 20;
+const RETRY_HISTORY_MESSAGES = 6;
+
 export async function generateAIResponse(
   business: Business,
   conversationId: number,
@@ -24,21 +27,16 @@ export async function generateAIResponse(
 ): Promise<AIResponseResult> {
   const systemPrompt = buildSystemPrompt(business);
 
-  const history = await db
+  // Load last N messages only — prevents context overflow in long conversations
+  const recentRows = await db
     .select()
     .from(whatsappMessagesTable)
     .where(eq(whatsappMessagesTable.conversationId, conversationId))
-    .orderBy(whatsappMessagesTable.createdAt);
+    .orderBy(desc(whatsappMessagesTable.createdAt))
+    .limit(MAX_HISTORY_MESSAGES);
 
-  const chatHistory = history.map((msg) => ({
-    role: msg.role === "assistant" ? "model" as const : "user" as const,
-    parts: [{ text: msg.content }],
-  }));
-
-  chatHistory.push({
-    role: "user",
-    parts: [{ text: customerMessage }],
-  });
+  // Reverse so oldest-first for the chat API
+  const history = recentRows.reverse();
 
   const { ragContext, topProduct } = await retrieveRelevantChunks(business.id, customerMessage);
 
@@ -46,39 +44,68 @@ export async function generateAIResponse(
     ? `${systemPrompt}\n\n${ragContext}`
     : systemPrompt;
 
-  // Add UPI payment instructions to system prompt if store has UPI configured
   const paymentPrompt = business.upiId
     ? `\n\nPAYMENT: If a customer wants to buy something, tell them you will send them a payment QR code. UPI ID: ${business.upiId}`
     : "";
 
-  try {
+  const systemInstruction = fullSystemPrompt + paymentPrompt;
+
+  const buildContents = (msgs: typeof history) => {
+    const contents = msgs.map((msg) => ({
+      role: msg.role === "assistant" ? "model" as const : "user" as const,
+      parts: [{ text: msg.content }],
+    }));
+    contents.push({ role: "user", parts: [{ text: customerMessage }] });
+    return contents;
+  };
+
+  const callGemini = async (msgs: typeof history) => {
     const response = await ai.models.generateContent({
       model: "gemini-2.5-flash",
-      contents: chatHistory,
-      config: {
-        systemInstruction: fullSystemPrompt + paymentPrompt,
-        maxOutputTokens: 8192,
-      },
+      contents: buildContents(msgs),
+      config: { systemInstruction, maxOutputTokens: 2048 },
     });
+    return response.text ?? "I'm sorry, I couldn't generate a response. Please try again.";
+  };
 
-    const text = response.text ?? "I'm sorry, I couldn't generate a response. Please try again.";
-
-    // Detect purchase intent
-    const msgLower = customerMessage.toLowerCase();
-    const purchaseIntent =
-      !!business.upiId &&
-      PURCHASE_INTENT_KEYWORDS.some((kw) => msgLower.includes(kw));
-
-    return {
-      text,
-      purchaseIntent,
-      detectedProductName: topProduct?.name,
-      detectedProductPrice: topProduct?.price,
-    };
+  let text: string;
+  try {
+    text = await callGemini(history);
   } catch (error) {
-    logger.error({ error, businessId: business.id }, "Gemini API error");
-    throw error;
+    const isContextError =
+      error instanceof Error &&
+      (error.message.includes("token") ||
+        error.message.includes("context") ||
+        error.message.includes("limit") ||
+        error.message.includes("too long") ||
+        error.message.includes("400") ||
+        error.message.includes("429"));
+
+    if (isContextError && history.length > RETRY_HISTORY_MESSAGES) {
+      logger.warn({ businessId: business.id, historyLen: history.length }, "Context too long — retrying with shorter history");
+      try {
+        text = await callGemini(history.slice(-RETRY_HISTORY_MESSAGES));
+      } catch (retryError) {
+        logger.error({ retryError, businessId: business.id }, "Gemini retry also failed");
+        throw retryError;
+      }
+    } else {
+      logger.error({ error, businessId: business.id }, "Gemini API error");
+      throw error;
+    }
   }
+
+  const msgLower = customerMessage.toLowerCase();
+  const purchaseIntent =
+    !!business.upiId &&
+    PURCHASE_INTENT_KEYWORDS.some((kw) => msgLower.includes(kw));
+
+  return {
+    text,
+    purchaseIntent,
+    detectedProductName: topProduct?.name,
+    detectedProductPrice: topProduct?.price,
+  };
 }
 
 interface TopProduct {

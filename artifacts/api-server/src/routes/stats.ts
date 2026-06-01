@@ -2,42 +2,85 @@ import { Router, type IRouter } from "express";
 import { eq, count, sql, inArray, and, gte } from "drizzle-orm";
 import { db, businessesTable, whatsappConversationsTable, whatsappMessagesTable } from "@workspace/db";
 import { GetBusinessStatsParams, GetBusinessStatsResponse, GetDashboardStatsResponse } from "@workspace/api-zod";
+import { requireAuth } from "../lib/auth-middleware";
 
 const router: IRouter = Router();
 
-router.get("/stats", async (req, res): Promise<void> => {
+router.get("/stats", requireAuth, async (req, res): Promise<void> => {
+  const uid = req.user!.uid;
   const today = new Date();
   today.setHours(0, 0, 0, 0);
 
-  const [totalBusinesses] = await db.select({ count: count() }).from(businessesTable);
+  // All stats scoped to the logged-in user's businesses
+  const userBusinessIds = await db
+    .select({ id: businessesTable.id })
+    .from(businessesTable)
+    .where(eq(businessesTable.ownerUid, uid));
+
+  const ids = userBusinessIds.map((b) => b.id);
+
+  const [totalBusinesses] = await db
+    .select({ count: count() })
+    .from(businessesTable)
+    .where(eq(businessesTable.ownerUid, uid));
+
   const [activeBusinesses] = await db
     .select({ count: count() })
     .from(businessesTable)
-    .where(eq(businessesTable.isActive, true));
-  const [totalConversations] = await db.select({ count: count() }).from(whatsappConversationsTable);
-  const [totalMessages] = await db.select({ count: count() }).from(whatsappMessagesTable);
-  const [messagesToday] = await db
-    .select({ count: count() })
-    .from(whatsappMessagesTable)
-    .where(sql`${whatsappMessagesTable.createdAt} >= ${today}`);
-  const [conversationsToday] = await db
-    .select({ count: count() })
-    .from(whatsappConversationsTable)
-    .where(sql`${whatsappConversationsTable.createdAt} >= ${today}`);
+    .where(and(eq(businessesTable.ownerUid, uid), eq(businessesTable.isActive, true)));
+
+  let totalConversations = 0;
+  let totalMessages = 0;
+  let messagesToday = 0;
+  let conversationsToday = 0;
+
+  if (ids.length > 0) {
+    const [tc] = await db
+      .select({ count: count() })
+      .from(whatsappConversationsTable)
+      .where(inArray(whatsappConversationsTable.businessId, ids));
+    totalConversations = tc?.count ?? 0;
+
+    const convIds = await db
+      .select({ id: whatsappConversationsTable.id })
+      .from(whatsappConversationsTable)
+      .where(inArray(whatsappConversationsTable.businessId, ids));
+
+    const cids = convIds.map((c) => c.id);
+    if (cids.length > 0) {
+      const [tm] = await db
+        .select({ count: count() })
+        .from(whatsappMessagesTable)
+        .where(inArray(whatsappMessagesTable.conversationId, cids));
+      totalMessages = tm?.count ?? 0;
+
+      const [mt] = await db
+        .select({ count: count() })
+        .from(whatsappMessagesTable)
+        .where(and(inArray(whatsappMessagesTable.conversationId, cids), gte(whatsappMessagesTable.createdAt, today)));
+      messagesToday = mt?.count ?? 0;
+    }
+
+    const [ct] = await db
+      .select({ count: count() })
+      .from(whatsappConversationsTable)
+      .where(and(inArray(whatsappConversationsTable.businessId, ids), gte(whatsappConversationsTable.createdAt, today)));
+    conversationsToday = ct?.count ?? 0;
+  }
 
   res.json(
     GetDashboardStatsResponse.parse({
       totalBusinesses: totalBusinesses?.count ?? 0,
       activeBusinesses: activeBusinesses?.count ?? 0,
-      totalConversations: totalConversations?.count ?? 0,
-      totalMessages: totalMessages?.count ?? 0,
-      messagesToday: messagesToday?.count ?? 0,
-      conversationsToday: conversationsToday?.count ?? 0,
+      totalConversations,
+      totalMessages,
+      messagesToday,
+      conversationsToday,
     })
   );
 });
 
-router.get("/stats/businesses/:id", async (req, res): Promise<void> => {
+router.get("/stats/businesses/:id", requireAuth, async (req, res): Promise<void> => {
   const params = GetBusinessStatsParams.safeParse({ id: req.params.id });
   if (!params.success) {
     res.status(400).json({ error: params.error.message });
@@ -45,6 +88,17 @@ router.get("/stats/businesses/:id", async (req, res): Promise<void> => {
   }
 
   const { id } = params.data;
+
+  // Verify ownership
+  const [business] = await db
+    .select({ id: businessesTable.id })
+    .from(businessesTable)
+    .where(and(eq(businessesTable.id, id), eq(businessesTable.ownerUid, req.user!.uid)));
+  if (!business) {
+    res.status(404).json({ error: "Business not found" });
+    return;
+  }
+
   const weekAgo = new Date();
   weekAgo.setDate(weekAgo.getDate() - 7);
 

@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { eq } from "drizzle-orm";
+import { eq, and } from "drizzle-orm";
 import { db, businessesTable } from "@workspace/db";
 import {
   startSession,
@@ -8,20 +8,26 @@ import {
   removeSSEClient,
   getSessionStatus,
 } from "../lib/session-manager";
+import { requireAuth } from "../lib/auth-middleware";
 
 const router: IRouter = Router();
 
-router.post("/sessions/:businessId/start", async (req, res): Promise<void> => {
-  const businessId = parseInt(
-    Array.isArray(req.params.businessId) ? req.params.businessId[0] : req.params.businessId,
-    10
-  );
+function parseBusinessId(param: string | string[]): number {
+  return parseInt(Array.isArray(param) ? param[0]! : param, 10);
+}
 
-  const [business] = await db.select().from(businessesTable).where(eq(businessesTable.id, businessId));
-  if (!business) {
-    res.status(404).json({ error: "Business not found" });
-    return;
-  }
+async function getOwnedBusiness(businessId: number, uid: string) {
+  const [b] = await db
+    .select()
+    .from(businessesTable)
+    .where(and(eq(businessesTable.id, businessId), eq(businessesTable.ownerUid, uid)));
+  return b ?? null;
+}
+
+router.post("/sessions/:businessId/start", requireAuth, async (req, res): Promise<void> => {
+  const businessId = parseBusinessId(req.params.businessId!);
+  const business = await getOwnedBusiness(businessId, req.user!.uid);
+  if (!business) { res.status(404).json({ error: "Business not found" }); return; }
 
   startSession(businessId).catch((err) => {
     req.log.error({ err, businessId }, "Session start failed");
@@ -30,11 +36,8 @@ router.post("/sessions/:businessId/start", async (req, res): Promise<void> => {
   res.json({ businessId, status: "starting" });
 });
 
-router.get("/sessions/:businessId/qr-stream", (req, res): void => {
-  const businessId = parseInt(
-    Array.isArray(req.params.businessId) ? req.params.businessId[0] : req.params.businessId,
-    10
-  );
+router.get("/sessions/:businessId/qr-stream", requireAuth, (req, res): void => {
+  const businessId = parseBusinessId(req.params.businessId!);
 
   res.setHeader("Content-Type", "text/event-stream");
   res.setHeader("Cache-Control", "no-cache");
@@ -51,17 +54,10 @@ router.get("/sessions/:businessId/qr-stream", (req, res): void => {
   });
 });
 
-router.get("/sessions/:businessId/status", async (req, res): Promise<void> => {
-  const businessId = parseInt(
-    Array.isArray(req.params.businessId) ? req.params.businessId[0] : req.params.businessId,
-    10
-  );
-
-  const [business] = await db.select().from(businessesTable).where(eq(businessesTable.id, businessId));
-  if (!business) {
-    res.status(404).json({ error: "Business not found" });
-    return;
-  }
+router.get("/sessions/:businessId/status", requireAuth, async (req, res): Promise<void> => {
+  const businessId = parseBusinessId(req.params.businessId!);
+  const business = await getOwnedBusiness(businessId, req.user!.uid);
+  if (!business) { res.status(404).json({ error: "Business not found" }); return; }
 
   const memStatus = getSessionStatus(businessId);
 
@@ -72,11 +68,10 @@ router.get("/sessions/:businessId/status", async (req, res): Promise<void> => {
   });
 });
 
-router.post("/sessions/:businessId/disconnect", async (req, res): Promise<void> => {
-  const businessId = parseInt(
-    Array.isArray(req.params.businessId) ? req.params.businessId[0] : req.params.businessId,
-    10
-  );
+router.post("/sessions/:businessId/disconnect", requireAuth, async (req, res): Promise<void> => {
+  const businessId = parseBusinessId(req.params.businessId!);
+  const business = await getOwnedBusiness(businessId, req.user!.uid);
+  if (!business) { res.status(404).json({ error: "Business not found" }); return; }
 
   await stopSession(businessId);
   res.json({ businessId, status: "disconnected" });

@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { eq, count, sql } from "drizzle-orm";
+import { eq, count, sql, and } from "drizzle-orm";
 import { db, whatsappConversationsTable, whatsappMessagesTable, businessesTable } from "@workspace/db";
 import {
   ListBusinessConversationsParams,
@@ -7,11 +7,12 @@ import {
   ListConversationMessagesParams,
   ListConversationMessagesResponse,
 } from "@workspace/api-zod";
+import { requireAuth } from "../lib/auth-middleware";
 
 const router: IRouter = Router();
 
-// All conversations across all businesses (for inbox view)
-router.get("/conversations/all", async (req, res): Promise<void> => {
+// All conversations scoped to the logged-in user's businesses (for inbox view)
+router.get("/conversations/all", requireAuth, async (req, res): Promise<void> => {
   const rows = await db.execute(sql`
     SELECT
       wc.id,
@@ -27,6 +28,7 @@ router.get("/conversations/all", async (req, res): Promise<void> => {
     FROM whatsapp_conversations wc
     LEFT JOIN businesses b ON b.id = wc.business_id
     LEFT JOIN whatsapp_messages wm ON wm.conversation_id = wc.id
+    WHERE b.owner_uid = ${req.user!.uid}
     GROUP BY wc.id, b.name
     ORDER BY MAX(wm.created_at) DESC NULLS LAST
     LIMIT 200
@@ -34,10 +36,20 @@ router.get("/conversations/all", async (req, res): Promise<void> => {
   res.json(rows.rows);
 });
 
-router.get("/businesses/:id/conversations", async (req, res): Promise<void> => {
+router.get("/businesses/:id/conversations", requireAuth, async (req, res): Promise<void> => {
   const params = ListBusinessConversationsParams.safeParse({ id: req.params.id });
   if (!params.success) {
     res.status(400).json({ error: params.error.message });
+    return;
+  }
+
+  // Verify ownership
+  const [business] = await db
+    .select({ id: businessesTable.id })
+    .from(businessesTable)
+    .where(and(eq(businessesTable.id, params.data.id), eq(businessesTable.ownerUid, req.user!.uid)));
+  if (!business) {
+    res.status(404).json({ error: "Business not found" });
     return;
   }
 
@@ -72,10 +84,31 @@ router.get("/businesses/:id/conversations", async (req, res): Promise<void> => {
   res.json(ListBusinessConversationsResponse.parse(withCounts));
 });
 
-router.get("/conversations/:id/messages", async (req, res): Promise<void> => {
+router.get("/conversations/:id/messages", requireAuth, async (req, res): Promise<void> => {
   const params = ListConversationMessagesParams.safeParse({ id: req.params.id });
   if (!params.success) {
     res.status(400).json({ error: params.error.message });
+    return;
+  }
+
+  // Verify the conversation belongs to one of this user's businesses
+  const [conv] = await db
+    .select({ businessId: whatsappConversationsTable.businessId })
+    .from(whatsappConversationsTable)
+    .where(eq(whatsappConversationsTable.id, params.data.id));
+
+  if (!conv) {
+    res.status(404).json({ error: "Conversation not found" });
+    return;
+  }
+
+  const [business] = await db
+    .select({ id: businessesTable.id })
+    .from(businessesTable)
+    .where(and(eq(businessesTable.id, conv.businessId), eq(businessesTable.ownerUid, req.user!.uid)));
+
+  if (!business) {
+    res.status(403).json({ error: "Access denied" });
     return;
   }
 

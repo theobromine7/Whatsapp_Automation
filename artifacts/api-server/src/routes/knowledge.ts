@@ -3,6 +3,7 @@ import { eq, and } from "drizzle-orm";
 import { db, knowledgeChunksTable, businessesTable } from "@workspace/db";
 import { embedText } from "@workspace/integrations-gemini-ai";
 import { broadcastToRecentCustomers, buildProductBroadcastMessage } from "../lib/broadcast";
+import { requireAuth } from "../lib/auth-middleware";
 
 const router: IRouter = Router();
 
@@ -23,12 +24,20 @@ function parseChunkInput(body: unknown): { title: string; content: string; sourc
   return { title: title.trim(), content: content.trim(), sourceType: sourceType as SourceType };
 }
 
-router.get("/businesses/:id/knowledge", async (req, res): Promise<void> => {
+async function getOwnedBusiness(id: number, uid: string) {
+  const [b] = await db
+    .select()
+    .from(businessesTable)
+    .where(and(eq(businessesTable.id, id), eq(businessesTable.ownerUid, uid)));
+  return b ?? null;
+}
+
+router.get("/businesses/:id/knowledge", requireAuth, async (req, res): Promise<void> => {
   const id = parseId(req.params.id);
-  if (!id) {
-    res.status(400).json({ error: "Invalid business id" });
-    return;
-  }
+  if (!id) { res.status(400).json({ error: "Invalid business id" }); return; }
+
+  const business = await getOwnedBusiness(id, req.user!.uid);
+  if (!business) { res.status(404).json({ error: "Business not found" }); return; }
 
   const chunks = await db
     .select({
@@ -46,27 +55,12 @@ router.get("/businesses/:id/knowledge", async (req, res): Promise<void> => {
   res.json(chunks);
 });
 
-router.post("/businesses/:id/knowledge", async (req, res): Promise<void> => {
+router.post("/businesses/:id/knowledge", requireAuth, async (req, res): Promise<void> => {
   const id = parseId(req.params.id);
-  if (!id) {
-    res.status(400).json({ error: "Invalid business id" });
-    return;
-  }
+  if (!id) { res.status(400).json({ error: "Invalid business id" }); return; }
 
-  const [business] = await db
-    .select({
-      id: businessesTable.id,
-      name: businessesTable.name,
-      connectionType: businessesTable.connectionType,
-      whatsappPhoneNumberId: businessesTable.whatsappPhoneNumberId,
-      whatsappAccessToken: businessesTable.whatsappAccessToken,
-    })
-    .from(businessesTable)
-    .where(eq(businessesTable.id, id));
-  if (!business) {
-    res.status(404).json({ error: "Business not found" });
-    return;
-  }
+  const business = await getOwnedBusiness(id, req.user!.uid);
+  if (!business) { res.status(404).json({ error: "Business not found" }); return; }
 
   const input = parseChunkInput(req.body);
   if (!input) {
@@ -83,13 +77,7 @@ router.post("/businesses/:id/knowledge", async (req, res): Promise<void> => {
 
   const [chunk] = await db
     .insert(knowledgeChunksTable)
-    .values({
-      businessId: id,
-      title: input.title,
-      content: input.content,
-      sourceType: input.sourceType,
-      embedding,
-    })
+    .values({ businessId: id, title: input.title, content: input.content, sourceType: input.sourceType, embedding })
     .returning({
       id: knowledgeChunksTable.id,
       businessId: knowledgeChunksTable.businessId,
@@ -109,28 +97,20 @@ router.post("/businesses/:id/knowledge", async (req, res): Promise<void> => {
   res.status(201).json(chunk);
 });
 
-router.delete("/businesses/:id/knowledge/:chunkId", async (req, res): Promise<void> => {
+router.delete("/businesses/:id/knowledge/:chunkId", requireAuth, async (req, res): Promise<void> => {
   const id = parseId(req.params.id);
   const chunkId = parseId(req.params.chunkId);
-  if (!id || !chunkId) {
-    res.status(400).json({ error: "Invalid id" });
-    return;
-  }
+  if (!id || !chunkId) { res.status(400).json({ error: "Invalid id" }); return; }
+
+  const business = await getOwnedBusiness(id, req.user!.uid);
+  if (!business) { res.status(404).json({ error: "Business not found" }); return; }
 
   const [deleted] = await db
     .delete(knowledgeChunksTable)
-    .where(
-      and(
-        eq(knowledgeChunksTable.id, chunkId),
-        eq(knowledgeChunksTable.businessId, id)
-      )
-    )
+    .where(and(eq(knowledgeChunksTable.id, chunkId), eq(knowledgeChunksTable.businessId, id)))
     .returning({ id: knowledgeChunksTable.id });
 
-  if (!deleted) {
-    res.status(404).json({ error: "Knowledge chunk not found" });
-    return;
-  }
+  if (!deleted) { res.status(404).json({ error: "Knowledge chunk not found" }); return; }
 
   res.sendStatus(204);
 });

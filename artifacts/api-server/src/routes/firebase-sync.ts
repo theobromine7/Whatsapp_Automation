@@ -4,6 +4,7 @@ import { db, businessesTable, knowledgeChunksTable } from "@workspace/db";
 import { embedText } from "@workspace/integrations-gemini-ai";
 import { fetchStoreByOwner, fetchProductsByStoreId } from "../lib/firebase";
 import { logger } from "../lib/logger";
+import { requireAuth } from "../lib/auth-middleware";
 
 const router: IRouter = Router();
 
@@ -39,7 +40,7 @@ function buildProductContent(p: {
 
 // POST /businesses/:id/firebase-sync
 // Body: { firebaseUid: string }
-router.post("/businesses/:id/firebase-sync", async (req, res): Promise<void> => {
+router.post("/businesses/:id/firebase-sync", requireAuth, async (req, res): Promise<void> => {
   const id = parseId(req.params.id);
   if (!id) {
     res.status(400).json({ error: "Invalid business id" });
@@ -49,7 +50,7 @@ router.post("/businesses/:id/firebase-sync", async (req, res): Promise<void> => 
   const [business] = await db
     .select()
     .from(businessesTable)
-    .where(eq(businessesTable.id, id));
+    .where(and(eq(businessesTable.id, id), eq(businessesTable.ownerUid, req.user!.uid)));
 
   if (!business) {
     res.status(404).json({ error: "Business not found" });
@@ -171,7 +172,7 @@ router.post("/businesses/:id/firebase-sync", async (req, res): Promise<void> => 
 });
 
 // GET /businesses/:id/firebase-sync — return current sync status
-router.get("/businesses/:id/firebase-sync", async (req, res): Promise<void> => {
+router.get("/businesses/:id/firebase-sync", requireAuth, async (req, res): Promise<void> => {
   const id = parseId(req.params.id);
   if (!id) {
     res.status(400).json({ error: "Invalid business id" });
@@ -187,7 +188,7 @@ router.get("/businesses/:id/firebase-sync", async (req, res): Promise<void> => {
       lastSyncedAt: businessesTable.lastSyncedAt,
     })
     .from(businessesTable)
-    .where(eq(businessesTable.id, id));
+    .where(and(eq(businessesTable.id, id), eq(businessesTable.ownerUid, req.user!.uid)));
 
   if (!business) {
     res.status(404).json({ error: "Business not found" });

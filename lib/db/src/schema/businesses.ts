@@ -25,6 +25,9 @@ export const businessesTable = pgTable("businesses", {
   sessionStatus: text("session_status"), // 'pending' | 'connected' | 'disconnected'
   connectedPhone: text("connected_phone"),
 
+  // Owner — Firebase Auth UID of the user who created this business
+  ownerUid: text("owner_uid"),
+
   // Advize Firebase store linkage
   firebaseUid: text("firebase_uid"),       // owner_id from Firestore stores collection
   upiId: text("upi_id"),                   // upi_id from Firestore store doc

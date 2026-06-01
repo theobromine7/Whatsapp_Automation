@@ -1,5 +1,6 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
 import { onAuthChange } from "@/lib/firebase";
+import { setAuthTokenGetter } from "@workspace/api-client-react";
 import type { User } from "firebase/auth";
 
 interface AuthContextValue {
@@ -17,6 +18,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const unsub = onAuthChange((u) => {
       setUser(u);
       setLoading(false);
+      if (u) {
+        setAuthTokenGetter(() => u.getIdToken());
+      } else {
+        setAuthTokenGetter(null);
+      }
     });
     return unsub;
   }, []);

@@ -1,7 +1,8 @@
 import { Router, type IRouter } from "express";
-import { eq, desc } from "drizzle-orm";
+import { eq, and, desc } from "drizzle-orm";
 import { db, broadcastsTable, whatsappConversationsTable, businessesTable } from "@workspace/db";
-import { broadcastToRecentCustomers, buildProductBroadcastMessage } from "../lib/broadcast";
+import { broadcastToRecentCustomers } from "../lib/broadcast";
+import { requireAuth } from "../lib/auth-middleware";
 
 const router: IRouter = Router();
 
@@ -10,12 +11,20 @@ function parseId(val: unknown): number | null {
   return Number.isInteger(n) && n > 0 ? n : null;
 }
 
-router.get("/businesses/:id/contacts", async (req, res): Promise<void> => {
+async function getOwnedBusiness(id: number, uid: string) {
+  const [b] = await db
+    .select()
+    .from(businessesTable)
+    .where(and(eq(businessesTable.id, id), eq(businessesTable.ownerUid, uid)));
+  return b ?? null;
+}
+
+router.get("/businesses/:id/contacts", requireAuth, async (req, res): Promise<void> => {
   const id = parseId(req.params.id);
-  if (!id) {
-    res.status(400).json({ error: "Invalid business id" });
-    return;
-  }
+  if (!id) { res.status(400).json({ error: "Invalid business id" }); return; }
+
+  const business = await getOwnedBusiness(id, req.user!.uid);
+  if (!business) { res.status(404).json({ error: "Business not found" }); return; }
 
   const contacts = await db
     .selectDistinct({
@@ -31,12 +40,12 @@ router.get("/businesses/:id/contacts", async (req, res): Promise<void> => {
   res.json(contacts);
 });
 
-router.get("/businesses/:id/broadcasts", async (req, res): Promise<void> => {
+router.get("/businesses/:id/broadcasts", requireAuth, async (req, res): Promise<void> => {
   const id = parseId(req.params.id);
-  if (!id) {
-    res.status(400).json({ error: "Invalid business id" });
-    return;
-  }
+  if (!id) { res.status(400).json({ error: "Invalid business id" }); return; }
+
+  const business = await getOwnedBusiness(id, req.user!.uid);
+  if (!business) { res.status(404).json({ error: "Business not found" }); return; }
 
   const broadcasts = await db
     .select()
@@ -47,12 +56,9 @@ router.get("/businesses/:id/broadcasts", async (req, res): Promise<void> => {
   res.json(broadcasts);
 });
 
-router.post("/businesses/:id/broadcasts", async (req, res): Promise<void> => {
+router.post("/businesses/:id/broadcasts", requireAuth, async (req, res): Promise<void> => {
   const id = parseId(req.params.id);
-  if (!id) {
-    res.status(400).json({ error: "Invalid business id" });
-    return;
-  }
+  if (!id) { res.status(400).json({ error: "Invalid business id" }); return; }
 
   const { message } = req.body as Record<string, unknown>;
   if (typeof message !== "string" || message.trim().length === 0) {
@@ -60,21 +66,8 @@ router.post("/businesses/:id/broadcasts", async (req, res): Promise<void> => {
     return;
   }
 
-  const [business] = await db
-    .select({
-      id: businessesTable.id,
-      name: businessesTable.name,
-      connectionType: businessesTable.connectionType,
-      whatsappPhoneNumberId: businessesTable.whatsappPhoneNumberId,
-      whatsappAccessToken: businessesTable.whatsappAccessToken,
-    })
-    .from(businessesTable)
-    .where(eq(businessesTable.id, id));
-
-  if (!business) {
-    res.status(404).json({ error: "Business not found" });
-    return;
-  }
+  const business = await getOwnedBusiness(id, req.user!.uid);
+  if (!business) { res.status(404).json({ error: "Business not found" }); return; }
 
   const recipientCount = await broadcastToRecentCustomers(business, message.trim());
 

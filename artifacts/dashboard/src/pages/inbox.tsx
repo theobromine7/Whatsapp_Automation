@@ -1,21 +1,21 @@
 import { useState, useEffect, useRef } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
 import {
   useListConversationMessages,
   getListConversationMessagesQueryKey,
+  customFetch,
 } from "@workspace/api-client-react";
 import { format, isToday, isYesterday } from "date-fns";
 import {
   Search,
   MessageSquare,
-  User,
   Bot,
-  Wifi,
-  WifiOff,
-  ChevronRight,
   Building2,
+  UserCheck,
+  Play,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 
@@ -27,6 +27,8 @@ interface ConversationListItem {
   businessName: string | null;
   customerPhone: string;
   customerName: string | null;
+  aiState: string; // 'AI_ACTIVE' | 'OWNER_TAKEN_OVER'
+  ownerLastMessageAt: string | null;
   updatedAt: string;
   createdAt: string;
   messageCount: number;
@@ -63,11 +65,25 @@ function avatarColor(id: number) {
 
 function ChatView({ conv }: { conv: ConversationListItem }) {
   const bottomRef = useRef<HTMLDivElement>(null);
+  const queryClient = useQueryClient();
+
+  const isTakenOver = conv.aiState === "OWNER_TAKEN_OVER";
 
   const { data: messages, isLoading } = useListConversationMessages(conv.id, {
     query: {
       queryKey: getListConversationMessagesQueryKey(conv.id),
       refetchInterval: 4000,
+    },
+  });
+
+  const resumeAI = useMutation({
+    mutationFn: () =>
+      customFetch(`/conversations/${conv.id}/ai-state`, {
+        method: "PATCH",
+        body: JSON.stringify({ aiState: "AI_ACTIVE" }),
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["conversations-all"] });
     },
   });
 
@@ -90,9 +106,17 @@ function ChatView({ conv }: { conv: ConversationListItem }) {
             {conv.customerPhone} · {conv.businessName}
           </p>
         </div>
-        <Badge variant="outline" className="text-[10px] border-primary/30 text-primary bg-primary/5 shrink-0">
-          AI Bot Active
-        </Badge>
+        {isTakenOver ? (
+          <Badge variant="outline" className="text-[10px] border-orange-400/60 text-orange-600 bg-orange-50 gap-1 shrink-0">
+            <UserCheck className="w-2.5 h-2.5" />
+            Human Active
+          </Badge>
+        ) : (
+          <Badge variant="outline" className="text-[10px] border-primary/30 text-primary bg-primary/5 gap-1 shrink-0">
+            <Bot className="w-2.5 h-2.5" />
+            AI Active
+          </Badge>
+        )}
       </div>
 
       {/* Messages area */}
@@ -159,12 +183,38 @@ function ChatView({ conv }: { conv: ConversationListItem }) {
         <div ref={bottomRef} />
       </div>
 
-      {/* Fake input */}
+      {/* Status bar / action area */}
       <div className="px-4 py-3 bg-[#f0f2f5] border-t border-[#e9edef] shrink-0">
-        <div className="bg-white rounded-full px-4 py-2.5 text-sm text-[#8696a0] flex items-center justify-between">
-          <span>AI agent is handling this conversation automatically</span>
-          <Bot className="w-4 h-4 text-primary/60" />
-        </div>
+        {isTakenOver ? (
+          <div className="bg-orange-50 border border-orange-200 rounded-xl px-4 py-2.5 flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2 min-w-0">
+              <UserCheck className="w-4 h-4 text-orange-500 shrink-0" />
+              <span className="text-sm text-orange-700 truncate">
+                AI paused — you're handling this chat
+                {conv.ownerLastMessageAt && (
+                  <span className="text-orange-400 ml-1 text-xs">
+                    · resumes automatically in 30 min
+                  </span>
+                )}
+              </span>
+            </div>
+            <Button
+              size="sm"
+              variant="outline"
+              className="border-orange-300 text-orange-700 hover:bg-orange-100 shrink-0 h-7 text-xs gap-1"
+              onClick={() => resumeAI.mutate()}
+              disabled={resumeAI.isPending}
+            >
+              <Play className="w-3 h-3" />
+              Resume AI
+            </Button>
+          </div>
+        ) : (
+          <div className="bg-white rounded-full px-4 py-2.5 text-sm text-[#8696a0] flex items-center justify-between">
+            <span>AI agent is handling this conversation automatically</span>
+            <Bot className="w-4 h-4 text-primary/60" />
+          </div>
+        )}
       </div>
     </div>
   );
@@ -197,9 +247,16 @@ function ConvItem({
           <span className="font-semibold text-sm text-[#111b21] truncate">
             {conv.customerName || conv.customerPhone}
           </span>
-          <span className="text-[11px] text-[#667781] shrink-0 ml-2">
-            {formatConvTime(conv.lastMessageAt || conv.updatedAt)}
-          </span>
+          <div className="flex items-center gap-1.5 shrink-0 ml-2">
+            {conv.aiState === "OWNER_TAKEN_OVER" && (
+              <span title="Human active — AI paused">
+                <UserCheck className="w-3 h-3 text-orange-500" />
+              </span>
+            )}
+            <span className="text-[11px] text-[#667781]">
+              {formatConvTime(conv.lastMessageAt || conv.updatedAt)}
+            </span>
+          </div>
         </div>
         <div className="flex items-center justify-between">
           <p className="text-xs text-[#667781] truncate max-w-[180px]">
@@ -224,11 +281,8 @@ export default function Inbox() {
 
   const { data: conversations, isLoading } = useQuery<ConversationListItem[]>({
     queryKey: ["conversations-all"],
-    queryFn: async () => {
-      const res = await fetch("/api/conversations/all");
-      if (!res.ok) throw new Error("Failed to fetch conversations");
-      return res.json();
-    },
+    queryFn: () =>
+      customFetch<ConversationListItem[]>("/conversations/all", { responseType: "json" }),
     refetchInterval: 8000,
   });
 

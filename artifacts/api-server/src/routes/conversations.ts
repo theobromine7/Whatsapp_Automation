@@ -20,6 +20,8 @@ router.get("/conversations/all", requireAuth, async (req, res): Promise<void> =>
       b.name AS "businessName",
       wc.customer_phone AS "customerPhone",
       wc.customer_name AS "customerName",
+      wc.ai_state AS "aiState",
+      wc.owner_last_message_at AS "ownerLastMessageAt",
       wc.updated_at AS "updatedAt",
       wc.created_at AS "createdAt",
       COUNT(wm.id)::int AS "messageCount",
@@ -29,11 +31,53 @@ router.get("/conversations/all", requireAuth, async (req, res): Promise<void> =>
     LEFT JOIN businesses b ON b.id = wc.business_id
     LEFT JOIN whatsapp_messages wm ON wm.conversation_id = wc.id
     WHERE b.owner_uid = ${req.user!.uid}
-    GROUP BY wc.id, b.name
+    GROUP BY wc.id, b.name, wc.ai_state, wc.owner_last_message_at
     ORDER BY MAX(wm.created_at) DESC NULLS LAST
     LIMIT 200
   `);
   res.json(rows.rows);
+});
+
+// Manually set the AI state of a conversation (e.g. resume AI after human takeover)
+router.patch("/conversations/:id/ai-state", requireAuth, async (req, res): Promise<void> => {
+  const id = parseInt(req.params["id"] ?? "", 10);
+  if (isNaN(id)) {
+    res.status(400).json({ error: "Invalid conversation ID" });
+    return;
+  }
+
+  const { aiState } = req.body as { aiState?: string };
+  if (aiState !== "AI_ACTIVE" && aiState !== "OWNER_TAKEN_OVER") {
+    res.status(400).json({ error: "aiState must be AI_ACTIVE or OWNER_TAKEN_OVER" });
+    return;
+  }
+
+  const [conv] = await db
+    .select({ businessId: whatsappConversationsTable.businessId })
+    .from(whatsappConversationsTable)
+    .where(eq(whatsappConversationsTable.id, id));
+
+  if (!conv) {
+    res.status(404).json({ error: "Conversation not found" });
+    return;
+  }
+
+  const [business] = await db
+    .select({ id: businessesTable.id })
+    .from(businessesTable)
+    .where(and(eq(businessesTable.id, conv.businessId), eq(businessesTable.ownerUid, req.user!.uid)));
+
+  if (!business) {
+    res.status(403).json({ error: "Access denied" });
+    return;
+  }
+
+  await db
+    .update(whatsappConversationsTable)
+    .set({ aiState })
+    .where(eq(whatsappConversationsTable.id, id));
+
+  res.json({ id, aiState });
 });
 
 router.get("/businesses/:id/conversations", requireAuth, async (req, res): Promise<void> => {

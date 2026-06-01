@@ -24,6 +24,11 @@ interface SessionEntry {
 const sessions = new Map<number, SessionEntry>();
 const restartTimers = new Map<number, ReturnType<typeof setTimeout>>();
 
+// Per-session map of JID → true for contacts saved in the owner's address book.
+// A contact is "saved" when Baileys reports contact.name (set by the owner),
+// as opposed to contact.notify (the contact's own chosen display name).
+const sessionSavedContacts = new Map<number, Set<string>>();
+
 function clearRestartTimer(businessId: number): void {
   const timer = restartTimers.get(businessId);
   if (timer) {
@@ -187,8 +192,33 @@ export async function startSession(businessId: number): Promise<void> {
 
   sock.ev.on("creds.update", saveCreds);
 
+  // Track which contacts the owner has saved in their address book.
+  // Baileys sets contact.name when the owner has explicitly saved the number.
+  // contact.notify is what the other person chose as their own display name — NOT a saved contact.
+  const savedContacts = new Set<string>();
+  sessionSavedContacts.set(businessId, savedContacts);
+
+  sock.ev.on("contacts.upsert", (contacts) => {
+    for (const contact of contacts) {
+      if (contact.name) {
+        savedContacts.add(contact.id);
+      }
+    }
+    logger.info({ businessId, savedCount: savedContacts.size }, "Saved contacts updated");
+  });
+
+  sock.ev.on("contacts.update", (updates) => {
+    for (const update of updates) {
+      if (!update.id) continue;
+      if (update.name) {
+        savedContacts.add(update.id);
+      } else if (update.name === null) {
+        savedContacts.delete(update.id);
+      }
+    }
+  });
+
   sock.ev.on("messages.upsert", async ({ messages, type }) => {
-    // Diagnostic: log every upsert event so we can see what Baileys receives
     logger.info({ businessId, type, count: messages.length, jids: messages.map(m => m.key.remoteJid) }, "messages.upsert received");
 
     if (type !== "notify") return;
@@ -199,6 +229,15 @@ export async function startSession(businessId: number): Promise<void> {
       // Accept real 1-on-1 messages: standard @s.whatsapp.net and newer
       // privacy-preserving @lid JIDs. Skip groups (@g.us) and newsletters (@newsletter).
       if (!jid || (!jid.endsWith("@s.whatsapp.net") && !jid.endsWith("@lid"))) continue;
+
+      // ── Saved Contact Filter ──────────────────────────────────────────────
+      // If the sender is in the owner's saved contacts, skip AI automation.
+      // Saved contacts are friends, family, staff, suppliers — not leads.
+      if (savedContacts.has(jid)) {
+        logger.info({ businessId, jid }, "Skipping saved contact — no AI reply sent");
+        continue;
+      }
+      // ─────────────────────────────────────────────────────────────────────
 
       // Strip domain and optional multi-device suffix
       // e.g. "919140600553:5@s.whatsapp.net" → "919140600553"
@@ -259,6 +298,7 @@ export async function stopSession(businessId: number): Promise<void> {
 
   entry.sseClients.clear();
   sessions.delete(businessId);
+  sessionSavedContacts.delete(businessId);
 
   await db
     .update(businessesTable)

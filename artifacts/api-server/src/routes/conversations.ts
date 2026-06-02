@@ -146,11 +146,10 @@ router.patch("/conversations/:id/contact-tag", requireAuth, async (req, res): Pr
 
     const BLOCKING_TAGS = new Set(["PERSONAL", "FAMILY", "STAFF", "SUPPLIER"]);
     const tagValue = (contactTag ?? null) as any;
+    // Blocking tag → silence AI; non-blocking tag or cleared tag → restore AI
     const stateUpdate = tagValue && BLOCKING_TAGS.has(tagValue)
       ? { contactTag: tagValue, aiState: "PERSONAL_CONTACT" as const }
-      : tagValue === null
-        ? { contactTag: null, aiState: "AI_ACTIVE" as const }
-        : { contactTag: tagValue };
+      : { contactTag: tagValue, aiState: "AI_ACTIVE" as const };
 
     const [updated] = await db
       .update(whatsappConversationsTable)

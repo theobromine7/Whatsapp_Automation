@@ -32,6 +32,8 @@ export async function handleIncomingMessage(opts: {
       )
     );
 
+  const isFirstMessage = !conversation;
+
   if (!conversation) {
     const [newConv] = await db
       .insert(whatsappConversationsTable)
@@ -97,7 +99,8 @@ export async function handleIncomingMessage(opts: {
   }
 
   // ── Intent Filter — skip low-value acknowledgements ───────────────────────
-  if (isLowValueMessage(messageText)) {
+  // Never suppress on first message — a "hey" from a new contact is a valid opener.
+  if (!isFirstMessage && isLowValueMessage(messageText)) {
     logger.info(
       { businessId: business.id, conversationId: conversation.id, messageText },
       "Low-value message — AI reply suppressed"

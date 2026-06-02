@@ -94,19 +94,13 @@ export function isLowValueMessage(text: string): boolean {
   // Single emoji reactions or punctuation only
   if (/^[\p{Emoji}\s!.?,]*$/u.test(normalised) && normalised.length <= 8) return true;
 
-  // Common low-value phrases (full match, allowing trailing punctuation)
+  // Common low-value phrases — ONLY dead-end closings that need no reply.
+  // Do NOT include greetings (hey/hi/hello), yes/no answers, or anything
+  // that could be a response to a question the bot asked.
   const LOW_VALUE_PHRASES = [
-    "ok", "okay", "k", "kk",
     "thanks", "thank you", "thx", "thnx", "ty",
     "done", "noted", "noted thanks", "noted thank you",
-    "alright", "alright thanks",
-    "got it", "got it thanks",
-    "sure", "sure thanks",
-    "hmm", "hm", "uh",
-    "great", "nice", "cool", "good", "wow",
     "bye", "goodbye", "cya",
-    "hello", "hi", "hey", "hii", "hiii",
-    "yes", "no", "yep", "nope", "nah", "yeah",
   ];
 
   const stripped = normalised.replace(/[!.,?]+$/, "").trim();

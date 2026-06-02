@@ -29,7 +29,8 @@ if (!basePath) {
 export default defineConfig({
   base: basePath,
   define: {
-    "import.meta.env.VITE_FIREBASE_API_KEY": JSON.stringify(process.env.FIREBASE_API_KEY ?? ""),
+    "import.meta.env.VITE_FIREBASE_API_KEY": JSON.stringify(process.env.VITE_FIREBASE_API_KEY ?? ""),
+    "import.meta.env.VITE_FIREBASE_PROJECT_ID": JSON.stringify(process.env.VITE_FIREBASE_PROJECT_ID ?? ""),
   },
   plugins: [
     react(),

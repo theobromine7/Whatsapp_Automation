@@ -98,6 +98,21 @@ export async function handleIncomingMessage(opts: {
     return;
   }
 
+  // ── Contact Tag Guard — manual override always wins ───────────────────────
+  const BLOCKED_CONTACT_TAGS = new Set(["PERSONAL", "FAMILY", "STAFF", "SUPPLIER"]);
+  if (conversation.contactTag && BLOCKED_CONTACT_TAGS.has(conversation.contactTag)) {
+    logger.info(
+      { businessId: business.id, conversationId: conversation.id, contactTag: conversation.contactTag },
+      `AI reply suppressed — contact tag: ${conversation.contactTag}`
+    );
+    // Sync aiState so future messages don't need this check
+    await db
+      .update(whatsappConversationsTable)
+      .set({ aiState: "PERSONAL_CONTACT" })
+      .where(eq(whatsappConversationsTable.id, conversation.id));
+    return;
+  }
+
   // ── Intent Filter — skip low-value acknowledgements ───────────────────────
   // Never suppress on first message — a "hey" from a new contact is a valid opener.
   if (!isFirstMessage && isLowValueMessage(messageText)) {

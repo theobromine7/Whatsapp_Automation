@@ -144,13 +144,21 @@ router.patch("/conversations/:id/contact-tag", requireAuth, async (req, res): Pr
       .where(and(eq(businessesTable.id, conv.businessId), eq(businessesTable.ownerUid, req.user!.uid)));
     if (!business) { res.status(403).json({ error: "Access denied" }); return; }
 
+    const BLOCKING_TAGS = new Set(["PERSONAL", "FAMILY", "STAFF", "SUPPLIER"]);
+    const tagValue = (contactTag ?? null) as any;
+    const stateUpdate = tagValue && BLOCKING_TAGS.has(tagValue)
+      ? { contactTag: tagValue, aiState: "PERSONAL_CONTACT" as const }
+      : tagValue === null
+        ? { contactTag: null, aiState: "AI_ACTIVE" as const }
+        : { contactTag: tagValue };
+
     const [updated] = await db
       .update(whatsappConversationsTable)
-      .set({ contactTag: (contactTag ?? null) as any })
+      .set(stateUpdate)
       .where(eq(whatsappConversationsTable.id, id))
       .returning();
 
-    res.json({ id, contactTag: updated?.contactTag ?? null });
+    res.json({ id, contactTag: updated?.contactTag ?? null, aiState: updated?.aiState });
   } catch (err) {
     req.log.error({ err }, "Failed to update contact tag");
     res.status(500).json({ error: "Failed to update contact tag" });

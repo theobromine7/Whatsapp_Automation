@@ -1,23 +1,25 @@
 import { GoogleGenAI } from "@google/genai";
 
-const apiKey =
-  process.env.AI_INTEGRATIONS_GEMINI_API_KEY || process.env.GEMINI_API_KEY;
-
-if (!apiKey) {
-  throw new Error(
-    "A Gemini API key must be set. Please set GEMINI_API_KEY in your secrets.",
-  );
-}
-
-const embeddingClient = new GoogleGenAI({ apiKey });
-
 const EMBEDDING_MODEL = "text-embedding-004";
 const EMBEDDING_DIMENSIONS = 768;
 
 export { EMBEDDING_DIMENSIONS };
 
+function getEmbeddingClient(): GoogleGenAI {
+  const apiKey =
+    process.env.AI_INTEGRATIONS_GEMINI_API_KEY || process.env.GEMINI_API_KEY;
+
+  if (!apiKey) {
+    throw new Error(
+      "A Gemini API key must be set. Please set GEMINI_API_KEY in your secrets.",
+    );
+  }
+
+  return new GoogleGenAI({ apiKey });
+}
+
 export async function embedText(text: string): Promise<number[]> {
-  const result = await embeddingClient.models.embedContent({
+  const result = await getEmbeddingClient().models.embedContent({
     model: EMBEDDING_MODEL,
     contents: text,
   });

@@ -121,7 +121,7 @@ export async function handleIncomingMessage(opts: {
     aiResult = await generateAIResponse(business, conversation.id, messageText);
   } catch (err) {
     logger.error({ err, businessId: business.id }, "AI response generation failed");
-    const fallback = "Thanks for your message! We're experiencing a brief technical issue and will get back to you shortly.";
+    const fallback = `Hi! Thanks for reaching out to ${business.name ?? "us"}. We received your message and will respond shortly! 😊`;
     await db.insert(whatsappMessagesTable).values({ conversationId: conversation.id, role: "assistant", content: fallback });
     await sendReply(fallback);
     return;

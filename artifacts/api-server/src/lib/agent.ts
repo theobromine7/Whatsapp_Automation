@@ -148,10 +148,27 @@ Confidence scoring guide:
     return parseStructuredResponse(raw, customerMessage, business.upiId, topProduct);
   };
 
+  const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
   try {
     const result = await callGemini(history);
     return result;
   } catch (error) {
+    // Retry once on transient 503 (model overloaded) before giving up
+    const is503 =
+      error instanceof Error &&
+      (error.message.includes("503") || error.message.includes("UNAVAILABLE") || error.message.includes("high demand"));
+    if (is503) {
+      logger.warn({ businessId: business.id }, "Gemini 503 — retrying in 2s");
+      await sleep(2000);
+      try {
+        return await callGemini(history);
+      } catch (retryError) {
+        logger.error({ retryError, businessId: business.id }, "Gemini 503 retry also failed");
+        throw retryError;
+      }
+    }
+
     const isContextError =
       error instanceof Error &&
       (error.message.includes("token") ||

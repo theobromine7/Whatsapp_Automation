@@ -7,8 +7,13 @@
  */
 
 export interface Contact {
+  conversationId: number;
   customerPhone: string;
   customerName?: string | null;
+  /** @nullable */
+  contactType?: string | null;
+  /** @nullable */
+  contactTag?: string | null;
   lastSeen: Date;
   firstSeen: Date;
 }

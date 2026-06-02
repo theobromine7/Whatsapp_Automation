@@ -4,6 +4,7 @@ import { generateAIResponse } from "./agent";
 import { sendWhatsappMessage, sendWhatsappImage } from "./whatsapp";
 import { generateUpiQr } from "./upi";
 import { logger } from "./logger";
+import { classifyContact, shouldAutoReply } from "./lead-classifier";
 import type { Business } from "@workspace/db";
 
 export async function handleIncomingMessage(opts: {
@@ -61,13 +62,38 @@ export async function handleIncomingMessage(opts: {
     .set({ updatedAt: new Date() })
     .where(eq(whatsappConversationsTable.id, conversation.id));
 
-  // ── Human Takeover Guard ──────────────────────────────────────────────────
-  // Owner has manually replied in this conversation — AI stays silent until
-  // 30 minutes of owner inactivity triggers auto-resume.
+  // ── Lead Classification ───────────────────────────────────────────────────
+  // Classify on the first message (contactType not yet set) unless a manual
+  // contactTag is already present (owner override takes full precedence).
+  let contactType = conversation.contactType;
+  if (!contactType && !conversation.contactTag) {
+    contactType = await classifyContact(messageText, customerName);
+    await db
+      .update(whatsappConversationsTable)
+      .set({ contactType })
+      .where(eq(whatsappConversationsTable.id, conversation.id));
+    logger.info(
+      { businessId: business.id, conversationId: conversation.id, customerPhone, contactType },
+      "Contact classified"
+    );
+  }
+  // ─────────────────────────────────────────────────────────────────────────
+
+  // ── Conversation Control Guard ────────────────────────────────────────────
+  // 1. Human takeover: owner manually replied — AI stays silent until 30-min auto-resume.
   if (conversation.aiState === "OWNER_TAKEN_OVER") {
     logger.info(
       { businessId: business.id, conversationId: conversation.id, customerPhone },
       "Conversation in OWNER_TAKEN_OVER state — AI reply suppressed"
+    );
+    return;
+  }
+
+  // 2. Contact filter: skip auto-reply for personal/family/staff/supplier contacts.
+  if (!shouldAutoReply(contactType, conversation.contactTag)) {
+    logger.info(
+      { businessId: business.id, conversationId: conversation.id, customerPhone, contactType, contactTag: conversation.contactTag },
+      "Contact type/tag not eligible for auto-reply — AI reply suppressed"
     );
     return;
   }
@@ -114,7 +140,6 @@ export async function handleIncomingMessage(opts: {
         await sendImage(qrBuffer, caption);
         logger.info({ businessId: business.id, customerPhone }, "UPI QR sent");
       } else {
-        // Fallback: for QR session we can't send images easily, send text UPI link
         const { buildUpiLink } = await import("./upi");
         const link = buildUpiLink({
           upiId: business.upiId,

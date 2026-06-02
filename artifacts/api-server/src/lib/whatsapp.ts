@@ -48,7 +48,7 @@ async function uploadWhatsappMedia(
   const formData = new FormData();
   formData.append("messaging_product", "whatsapp");
   formData.append("type", mimeType);
-  const blob = new Blob([imageBuffer], { type: mimeType });
+  const blob = new Blob([new Uint8Array(imageBuffer)], { type: mimeType });
   formData.append("file", blob, "payment_qr.png");
 
   const response = await fetch(url, {

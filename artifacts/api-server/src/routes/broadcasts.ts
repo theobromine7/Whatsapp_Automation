@@ -28,8 +28,11 @@ router.get("/businesses/:id/contacts", requireAuth, async (req, res): Promise<vo
 
   const contacts = await db
     .selectDistinct({
+      conversationId: whatsappConversationsTable.id,
       customerPhone: whatsappConversationsTable.customerPhone,
       customerName: whatsappConversationsTable.customerName,
+      contactType: whatsappConversationsTable.contactType,
+      contactTag: whatsappConversationsTable.contactTag,
       lastSeen: whatsappConversationsTable.updatedAt,
       firstSeen: whatsappConversationsTable.createdAt,
     })

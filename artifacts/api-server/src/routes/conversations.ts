@@ -1,6 +1,7 @@
 import { Router, type IRouter } from "express";
 import { eq, count, sql, and } from "drizzle-orm";
 import { db, whatsappConversationsTable, whatsappMessagesTable, businessesTable } from "@workspace/db";
+import { CONTACT_TAGS } from "@workspace/db";
 import {
   ListBusinessConversationsParams,
   ListBusinessConversationsResponse,
@@ -21,6 +22,8 @@ router.get("/conversations/all", requireAuth, async (req, res): Promise<void> =>
       wc.customer_phone AS "customerPhone",
       wc.customer_name AS "customerName",
       wc.ai_state AS "aiState",
+      wc.contact_type AS "contactType",
+      wc.contact_tag AS "contactTag",
       wc.owner_last_message_at AS "ownerLastMessageAt",
       wc.updated_at AS "updatedAt",
       wc.created_at AS "createdAt",
@@ -31,7 +34,7 @@ router.get("/conversations/all", requireAuth, async (req, res): Promise<void> =>
     LEFT JOIN businesses b ON b.id = wc.business_id
     LEFT JOIN whatsapp_messages wm ON wm.conversation_id = wc.id
     WHERE b.owner_uid = ${req.user!.uid}
-    GROUP BY wc.id, b.name, wc.ai_state, wc.owner_last_message_at
+    GROUP BY wc.id, b.name, wc.ai_state, wc.contact_type, wc.contact_tag, wc.owner_last_message_at
     ORDER BY MAX(wm.created_at) DESC NULLS LAST
     LIMIT 200
   `);
@@ -40,7 +43,7 @@ router.get("/conversations/all", requireAuth, async (req, res): Promise<void> =>
 
 // Manually set the AI state of a conversation (e.g. resume AI after human takeover)
 router.patch("/conversations/:id/ai-state", requireAuth, async (req, res): Promise<void> => {
-  const id = parseInt(req.params["id"] ?? "", 10);
+  const id = parseInt(String(req.params["id"] ?? ""), 10);
   if (isNaN(id)) {
     res.status(400).json({ error: "Invalid conversation ID" });
     return;
@@ -78,6 +81,51 @@ router.patch("/conversations/:id/ai-state", requireAuth, async (req, res): Promi
     .where(eq(whatsappConversationsTable.id, id));
 
   res.json({ id, aiState });
+});
+
+// Set a manual contact tag for a conversation (overrides AI classification for reply decisions)
+router.patch("/conversations/:id/contact-tag", requireAuth, async (req, res): Promise<void> => {
+  const id = parseInt(String(req.params["id"] ?? ""), 10);
+  if (isNaN(id)) {
+    res.status(400).json({ error: "Invalid conversation ID" });
+    return;
+  }
+
+  const { contactTag } = req.body as { contactTag?: string | null };
+
+  // Allow null to clear the tag
+  if (contactTag !== null && contactTag !== undefined && !(CONTACT_TAGS as readonly string[]).includes(contactTag)) {
+    res.status(400).json({ error: `contactTag must be one of: ${CONTACT_TAGS.join(", ")} or null` });
+    return;
+  }
+
+  const [conv] = await db
+    .select({ businessId: whatsappConversationsTable.businessId })
+    .from(whatsappConversationsTable)
+    .where(eq(whatsappConversationsTable.id, id));
+
+  if (!conv) {
+    res.status(404).json({ error: "Conversation not found" });
+    return;
+  }
+
+  const [business] = await db
+    .select({ id: businessesTable.id })
+    .from(businessesTable)
+    .where(and(eq(businessesTable.id, conv.businessId), eq(businessesTable.ownerUid, req.user!.uid)));
+
+  if (!business) {
+    res.status(403).json({ error: "Access denied" });
+    return;
+  }
+
+  const [updated] = await db
+    .update(whatsappConversationsTable)
+    .set({ contactTag: (contactTag ?? null) as any })
+    .where(eq(whatsappConversationsTable.id, id))
+    .returning();
+
+  res.json({ id, contactTag: updated?.contactTag ?? null });
 });
 
 router.get("/businesses/:id/conversations", requireAuth, async (req, res): Promise<void> => {

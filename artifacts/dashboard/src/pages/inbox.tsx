@@ -13,10 +13,21 @@ import {
   Building2,
   UserCheck,
   Play,
+  Tag,
+  ShieldOff,
+  ChevronDown,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -27,13 +38,60 @@ interface ConversationListItem {
   businessName: string | null;
   customerPhone: string;
   customerName: string | null;
-  aiState: string; // 'AI_ACTIVE' | 'OWNER_TAKEN_OVER'
+  aiState: string;
+  contactType: string | null;
+  contactTag: string | null;
   ownerLastMessageAt: string | null;
   updatedAt: string;
   createdAt: string;
   messageCount: number;
   lastMessage: string | null;
   lastMessageAt: string | null;
+}
+
+// ─── Contact Tag Config ───────────────────────────────────────────────────────
+
+const CONTACT_TAGS = ["PERSONAL", "FAMILY", "STAFF", "SUPPLIER", "CUSTOMER", "LEAD"] as const;
+type ContactTagValue = (typeof CONTACT_TAGS)[number];
+
+const TAG_STYLES: Record<ContactTagValue, string> = {
+  PERSONAL:  "border-pink-200 text-pink-700 bg-pink-50",
+  FAMILY:    "border-rose-200 text-rose-700 bg-rose-50",
+  STAFF:     "border-blue-200 text-blue-700 bg-blue-50",
+  SUPPLIER:  "border-amber-200 text-amber-700 bg-amber-50",
+  CUSTOMER:  "border-green-200 text-green-700 bg-green-50",
+  LEAD:      "border-violet-200 text-violet-700 bg-violet-50",
+};
+
+const TYPE_STYLES: Record<string, string> = {
+  SALES_LEAD:       "border-violet-200 text-violet-700 bg-violet-50",
+  CUSTOMER:         "border-green-200 text-green-700 bg-green-50",
+  PERSONAL_CONTACT: "border-pink-200 text-pink-700 bg-pink-50",
+  FAMILY:           "border-rose-200 text-rose-700 bg-rose-50",
+  STAFF:            "border-blue-200 text-blue-700 bg-blue-50",
+  SUPPLIER:         "border-amber-200 text-amber-700 bg-amber-50",
+  UNKNOWN:          "border-gray-200 text-gray-500 bg-gray-50",
+};
+
+const BLOCKED_TAGS = new Set(["PERSONAL", "FAMILY", "STAFF", "SUPPLIER"]);
+const BLOCKED_TYPES = new Set(["PERSONAL_CONTACT", "FAMILY", "STAFF", "SUPPLIER"]);
+
+function isAutoReplyBlocked(conv: ConversationListItem): boolean {
+  if (conv.contactTag && BLOCKED_TAGS.has(conv.contactTag)) return true;
+  if (!conv.contactTag && conv.contactType && BLOCKED_TYPES.has(conv.contactType)) return true;
+  return false;
+}
+
+function displayLabel(conv: ConversationListItem): string | null {
+  if (conv.contactTag) return conv.contactTag.charAt(0) + conv.contactTag.slice(1).toLowerCase();
+  if (conv.contactType) return conv.contactType.replace("_", " ").charAt(0) + conv.contactType.replace("_", " ").slice(1).toLowerCase();
+  return null;
+}
+
+function badgeStyle(conv: ConversationListItem): string {
+  if (conv.contactTag) return TAG_STYLES[conv.contactTag as ContactTagValue] ?? TAG_STYLES.CUSTOMER;
+  if (conv.contactType) return TYPE_STYLES[conv.contactType] ?? TYPE_STYLES.UNKNOWN;
+  return "";
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -61,13 +119,80 @@ function avatarColor(id: number) {
   return AVATAR_COLORS[id % AVATAR_COLORS.length];
 }
 
+// ─── Contact Tag Selector ─────────────────────────────────────────────────────
+
+function ContactTagSelector({
+  conv,
+  onTagChange,
+}: {
+  conv: ConversationListItem;
+  onTagChange: (tag: string | null) => void;
+}) {
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button
+          size="sm"
+          variant="outline"
+          className="h-7 gap-1 text-xs px-2 shrink-0"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <Tag className="w-3 h-3" />
+          {conv.contactTag
+            ? conv.contactTag.charAt(0) + conv.contactTag.slice(1).toLowerCase()
+            : "Tag"}
+          <ChevronDown className="w-3 h-3 opacity-50" />
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
+        <DropdownMenuLabel className="text-xs text-muted-foreground">Tag this contact</DropdownMenuLabel>
+        <DropdownMenuSeparator />
+        {CONTACT_TAGS.map((tag) => (
+          <DropdownMenuItem
+            key={tag}
+            className={cn("text-xs gap-2", conv.contactTag === tag && "font-semibold")}
+            onClick={() => onTagChange(tag)}
+          >
+            <span className={cn("w-2 h-2 rounded-full", {
+              "bg-pink-500": tag === "PERSONAL",
+              "bg-rose-500": tag === "FAMILY",
+              "bg-blue-500": tag === "STAFF",
+              "bg-amber-500": tag === "SUPPLIER",
+              "bg-green-500": tag === "CUSTOMER",
+              "bg-violet-500": tag === "LEAD",
+            })} />
+            {tag.charAt(0) + tag.slice(1).toLowerCase()}
+            {BLOCKED_TAGS.has(tag) && <span className="text-[10px] text-muted-foreground ml-auto">no auto-reply</span>}
+          </DropdownMenuItem>
+        ))}
+        {conv.contactTag && (
+          <>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem className="text-xs text-muted-foreground" onClick={() => onTagChange(null)}>
+              Clear tag
+            </DropdownMenuItem>
+          </>
+        )}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
+
 // ─── Chat view ────────────────────────────────────────────────────────────────
 
-function ChatView({ conv }: { conv: ConversationListItem }) {
+function ChatView({
+  conv,
+  onTagChange,
+}: {
+  conv: ConversationListItem;
+  onTagChange: (tag: string | null) => void;
+}) {
   const bottomRef = useRef<HTMLDivElement>(null);
   const queryClient = useQueryClient();
 
   const isTakenOver = conv.aiState === "OWNER_TAKEN_OVER";
+  const blocked = isAutoReplyBlocked(conv);
+  const label = displayLabel(conv);
 
   const { data: messages, isLoading } = useListConversationMessages(conv.id, {
     query: {
@@ -106,7 +231,24 @@ function ChatView({ conv }: { conv: ConversationListItem }) {
             {conv.customerPhone} · {conv.businessName}
           </p>
         </div>
-        {isTakenOver ? (
+
+        {/* Contact type/tag badge */}
+        {label && (
+          <Badge variant="outline" className={cn("text-[10px] px-1.5 shrink-0", badgeStyle(conv))}>
+            {label}
+          </Badge>
+        )}
+
+        {/* Tag selector */}
+        <ContactTagSelector conv={conv} onTagChange={onTagChange} />
+
+        {/* AI/human state badge */}
+        {blocked ? (
+          <Badge variant="outline" className="text-[10px] border-gray-300 text-gray-500 bg-gray-50 gap-1 shrink-0">
+            <ShieldOff className="w-2.5 h-2.5" />
+            No Auto-Reply
+          </Badge>
+        ) : isTakenOver ? (
           <Badge variant="outline" className="text-[10px] border-orange-400/60 text-orange-600 bg-orange-50 gap-1 shrink-0">
             <UserCheck className="w-2.5 h-2.5" />
             Human Active
@@ -185,7 +327,14 @@ function ChatView({ conv }: { conv: ConversationListItem }) {
 
       {/* Status bar / action area */}
       <div className="px-4 py-3 bg-[#f0f2f5] border-t border-[#e9edef] shrink-0">
-        {isTakenOver ? (
+        {blocked ? (
+          <div className="bg-gray-50 border border-gray-200 rounded-xl px-4 py-2.5 flex items-center gap-3">
+            <ShieldOff className="w-4 h-4 text-gray-400 shrink-0" />
+            <span className="text-sm text-gray-500 flex-1">
+              Auto-reply disabled — this contact is tagged as <span className="font-medium">{conv.contactTag ?? conv.contactType?.replace("_", " ").toLowerCase()}</span>
+            </span>
+          </div>
+        ) : isTakenOver ? (
           <div className="bg-orange-50 border border-orange-200 rounded-xl px-4 py-2.5 flex items-center justify-between gap-3">
             <div className="flex items-center gap-2 min-w-0">
               <UserCheck className="w-4 h-4 text-orange-500 shrink-0" />
@@ -231,6 +380,9 @@ function ConvItem({
   isActive: boolean;
   onClick: () => void;
 }) {
+  const blocked = isAutoReplyBlocked(conv);
+  const label = displayLabel(conv);
+
   return (
     <button
       onClick={onClick}
@@ -248,25 +400,36 @@ function ConvItem({
             {conv.customerName || conv.customerPhone}
           </span>
           <div className="flex items-center gap-1.5 shrink-0 ml-2">
-            {conv.aiState === "OWNER_TAKEN_OVER" && (
+            {blocked ? (
+              <span title="Auto-reply disabled for this contact">
+                <ShieldOff className="w-3 h-3 text-gray-400" />
+              </span>
+            ) : conv.aiState === "OWNER_TAKEN_OVER" ? (
               <span title="Human active — AI paused">
                 <UserCheck className="w-3 h-3 text-orange-500" />
               </span>
-            )}
+            ) : null}
             <span className="text-[11px] text-[#667781]">
               {formatConvTime(conv.lastMessageAt || conv.updatedAt)}
             </span>
           </div>
         </div>
-        <div className="flex items-center justify-between">
-          <p className="text-xs text-[#667781] truncate max-w-[180px]">
+        <div className="flex items-center justify-between gap-1">
+          <p className="text-xs text-[#667781] truncate max-w-[160px]">
             {conv.lastMessage || `${conv.messageCount} messages`}
           </p>
-          {conv.businessName && (
-            <span className="text-[10px] bg-primary/10 text-primary px-1.5 py-0.5 rounded-full shrink-0 ml-1 truncate max-w-[60px]">
-              {conv.businessName}
-            </span>
-          )}
+          <div className="flex items-center gap-1 shrink-0">
+            {label && (
+              <span className={cn("text-[9px] border px-1 py-0.5 rounded-full leading-none", badgeStyle(conv))}>
+                {label}
+              </span>
+            )}
+            {conv.businessName && (
+              <span className="text-[10px] bg-primary/10 text-primary px-1.5 py-0.5 rounded-full truncate max-w-[60px]">
+                {conv.businessName}
+              </span>
+            )}
+          </div>
         </div>
       </div>
     </button>
@@ -278,12 +441,24 @@ function ConvItem({
 export default function Inbox() {
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [search, setSearch] = useState("");
+  const queryClient = useQueryClient();
 
   const { data: conversations, isLoading } = useQuery<ConversationListItem[]>({
     queryKey: ["conversations-all"],
     queryFn: () =>
       customFetch<ConversationListItem[]>("/conversations/all", { responseType: "json" }),
     refetchInterval: 8000,
+  });
+
+  const setTagMutation = useMutation({
+    mutationFn: ({ id, contactTag }: { id: number; contactTag: string | null }) =>
+      customFetch(`/conversations/${id}/contact-tag`, {
+        method: "PATCH",
+        body: JSON.stringify({ contactTag }),
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["conversations-all"] });
+    },
   });
 
   const filtered = (conversations ?? []).filter((c) => {
@@ -369,7 +544,10 @@ export default function Inbox() {
       {/* Chat / Empty state */}
       <div className="flex-1 min-w-0 flex flex-col min-h-0">
         {selected ? (
-          <ChatView conv={selected} />
+          <ChatView
+            conv={selected}
+            onTagChange={(tag) => setTagMutation.mutate({ id: selected.id, contactTag: tag })}
+          />
         ) : (
           <div className="flex-1 flex flex-col items-center justify-center bg-[#f0f2f5] gap-4">
             <div className="w-20 h-20 rounded-full bg-[#d9d9d9] flex items-center justify-center">

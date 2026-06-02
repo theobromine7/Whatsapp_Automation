@@ -215,6 +215,43 @@ paths:
                 items:
                   $ref: "#/components/schemas/WhatsappConversation"
 
+  /conversations/{id}/contact-tag:
+    patch:
+      operationId: setConversationContactTag
+      tags: [conversations]
+      summary: Set or clear a manual contact tag on a conversation
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SetContactTagBody"
+      responses:
+        "200":
+          description: Updated contact tag
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SetContactTagResponse"
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+
   /conversations/{id}/messages:
     get:
       operationId: listConversationMessages
@@ -646,6 +683,14 @@ components:
           type: string
         customerName:
           type: ["string", "null"]
+        aiState:
+          type: string
+        contactType:
+          type: ["string", "null"]
+          description: "AI-classified contact type: SALES_LEAD | CUSTOMER | PERSONAL_CONTACT | FAMILY | STAFF | SUPPLIER | UNKNOWN"
+        contactTag:
+          type: ["string", "null"]
+          description: "Owner-set tag: PERSONAL | FAMILY | STAFF | SUPPLIER | CUSTOMER | LEAD"
         messageCount:
           type: integer
         lastMessageAt:
@@ -660,6 +705,26 @@ components:
         - customerPhone
         - messageCount
         - createdAt
+
+    SetContactTagBody:
+      type: object
+      properties:
+        contactTag:
+          type: ["string", "null"]
+          description: "One of: PERSONAL, FAMILY, STAFF, SUPPLIER, CUSTOMER, LEAD — or null to clear"
+      required:
+        - contactTag
+
+    SetContactTagResponse:
+      type: object
+      properties:
+        id:
+          type: integer
+        contactTag:
+          type: ["string", "null"]
+      required:
+        - id
+        - contactTag
 
     WhatsappMessage:
       type: object
@@ -735,11 +800,17 @@ components:
     Contact:
       type: object
       properties:
+        conversationId:
+          type: integer
         customerPhone:
           type: string
         customerName:
           type: string
           nullable: true
+        contactType:
+          type: ["string", "null"]
+        contactTag:
+          type: ["string", "null"]
         lastSeen:
           type: string
           format: date-time
@@ -747,6 +818,7 @@ components:
           type: string
           format: date-time
       required:
+        - conversationId
         - customerPhone
         - lastSeen
         - firstSeen

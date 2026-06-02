@@ -203,11 +203,31 @@ export const ListBusinessConversationsResponseItem = zod.object({
   "businessId": zod.number(),
   "customerPhone": zod.string(),
   "customerName": zod.string().nullish(),
+  "aiState": zod.string().optional(),
+  "contactType": zod.string().nullish().describe('AI-classified contact type: SALES_LEAD | CUSTOMER | PERSONAL_CONTACT | FAMILY | STAFF | SUPPLIER | UNKNOWN'),
+  "contactTag": zod.string().nullish().describe('Owner-set tag: PERSONAL | FAMILY | STAFF | SUPPLIER | CUSTOMER | LEAD'),
   "messageCount": zod.number(),
   "lastMessageAt": zod.coerce.date().nullish(),
   "createdAt": zod.coerce.date()
 })
 export const ListBusinessConversationsResponse = zod.array(ListBusinessConversationsResponseItem)
+
+
+/**
+ * @summary Set or clear a manual contact tag on a conversation
+ */
+export const SetConversationContactTagParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const SetConversationContactTagBody = zod.object({
+  "contactTag": zod.string().nullable().describe('One of: PERSONAL, FAMILY, STAFF, SUPPLIER, CUSTOMER, LEAD — or null to clear')
+})
+
+export const SetConversationContactTagResponse = zod.object({
+  "id": zod.number(),
+  "contactTag": zod.string().nullable()
+})
 
 
 /**
@@ -334,8 +354,11 @@ export const ListContactsParams = zod.object({
 })
 
 export const ListContactsResponseItem = zod.object({
+  "conversationId": zod.number(),
   "customerPhone": zod.string(),
   "customerName": zod.string().nullish(),
+  "contactType": zod.string().nullish(),
+  "contactTag": zod.string().nullish(),
   "lastSeen": zod.coerce.date(),
   "firstSeen": zod.coerce.date()
 })
@@ -402,6 +425,9 @@ export const GetBusinessStatsResponse = zod.object({
   "businessId": zod.number(),
   "customerPhone": zod.string(),
   "customerName": zod.string().nullish(),
+  "aiState": zod.string().optional(),
+  "contactType": zod.string().nullish().describe('AI-classified contact type: SALES_LEAD | CUSTOMER | PERSONAL_CONTACT | FAMILY | STAFF | SUPPLIER | UNKNOWN'),
+  "contactTag": zod.string().nullish().describe('Owner-set tag: PERSONAL | FAMILY | STAFF | SUPPLIER | CUSTOMER | LEAD'),
   "messageCount": zod.number(),
   "lastMessageAt": zod.coerce.date().nullish(),
   "createdAt": zod.coerce.date()

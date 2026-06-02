@@ -12,6 +12,17 @@ export interface WhatsappConversation {
   customerPhone: string;
   /** @nullable */
   customerName?: string | null;
+  aiState?: string;
+  /**
+     * AI-classified contact type: SALES_LEAD | CUSTOMER | PERSONAL_CONTACT | FAMILY | STAFF | SUPPLIER | UNKNOWN
+     * @nullable
+     */
+  contactType?: string | null;
+  /**
+     * Owner-set tag: PERSONAL | FAMILY | STAFF | SUPPLIER | CUSTOMER | LEAD
+     * @nullable
+     */
+  contactTag?: string | null;
   messageCount: number;
   /** @nullable */
   lastMessageAt?: Date | null;

@@ -34,6 +34,8 @@ import type {
   KnowledgeChunkInput,
   MetaCredentials,
   SessionStatus,
+  SetContactTagBody,
+  SetContactTagResponse,
   VerifyWhatsappWebhookParams,
   WebhookPayload,
   WhatsappConversation,
@@ -714,6 +716,78 @@ export function useListBusinessConversations<TData = Awaited<ReturnType<typeof l
 
 
 
+
+export const getSetConversationContactTagUrl = (id: number,) => {
+
+
+
+
+  return `/api/conversations/${id}/contact-tag`
+}
+
+/**
+ * @summary Set or clear a manual contact tag on a conversation
+ */
+export const setConversationContactTag = async (id: number,
+    setContactTagBody: SetContactTagBody, options?: RequestInit): Promise<SetContactTagResponse> => {
+
+  return customFetch<SetContactTagResponse>(getSetConversationContactTagUrl(id),
+  {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      setContactTagBody,)
+  }
+);}
+
+
+
+
+export const getSetConversationContactTagMutationOptions = <TError = ErrorType<ApiError>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof setConversationContactTag>>, TError,{id: number;data: BodyType<SetContactTagBody>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof setConversationContactTag>>, TError,{id: number;data: BodyType<SetContactTagBody>}, TContext> => {
+
+const mutationKey = ['setConversationContactTag'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof setConversationContactTag>>, {id: number;data: BodyType<SetContactTagBody>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  setConversationContactTag(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type SetConversationContactTagMutationResult = NonNullable<Awaited<ReturnType<typeof setConversationContactTag>>>
+    export type SetConversationContactTagMutationBody = BodyType<SetContactTagBody>
+    export type SetConversationContactTagMutationError = ErrorType<ApiError>
+
+    /**
+ * @summary Set or clear a manual contact tag on a conversation
+ */
+export const useSetConversationContactTag = <TError = ErrorType<ApiError>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof setConversationContactTag>>, TError,{id: number;data: BodyType<SetContactTagBody>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof setConversationContactTag>>,
+        TError,
+        {id: number;data: BodyType<SetContactTagBody>},
+        TContext
+      > => {
+      return useMutation(getSetConversationContactTagMutationOptions(options));
+    }
 
 export const getListConversationMessagesUrl = (id: number,) => {
 

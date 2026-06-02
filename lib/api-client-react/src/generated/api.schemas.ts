@@ -73,10 +73,35 @@ export interface WhatsappConversation {
   customerPhone: string;
   /** @nullable */
   customerName?: string | null;
+  aiState?: string;
+  /**
+     * AI-classified contact type: SALES_LEAD | CUSTOMER | PERSONAL_CONTACT | FAMILY | STAFF | SUPPLIER | UNKNOWN
+     * @nullable
+     */
+  contactType?: string | null;
+  /**
+     * Owner-set tag: PERSONAL | FAMILY | STAFF | SUPPLIER | CUSTOMER | LEAD
+     * @nullable
+     */
+  contactTag?: string | null;
   messageCount: number;
   /** @nullable */
   lastMessageAt?: string | null;
   createdAt: string;
+}
+
+export interface SetContactTagBody {
+  /**
+     * One of: PERSONAL, FAMILY, STAFF, SUPPLIER, CUSTOMER, LEAD — or null to clear
+     * @nullable
+     */
+  contactTag: string | null;
+}
+
+export interface SetContactTagResponse {
+  id: number;
+  /** @nullable */
+  contactTag: string | null;
 }
 
 export interface WhatsappMessage {
@@ -113,8 +138,13 @@ export interface DashboardStats {
 }
 
 export interface Contact {
+  conversationId: number;
   customerPhone: string;
   customerName?: string | null;
+  /** @nullable */
+  contactType?: string | null;
+  /** @nullable */
+  contactTag?: string | null;
   lastSeen: string;
   firstSeen: string;
 }

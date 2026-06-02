@@ -20,6 +20,8 @@ export * from './knowledgeChunk';
 export * from './knowledgeChunkInput';
 export * from './metaCredentials';
 export * from './sessionStatus';
+export * from './setContactTagBody';
+export * from './setContactTagResponse';
 export * from './verifyWhatsappWebhookParams';
 export * from './webhookPayload';
 export * from './webhookPayloadEntryItem';

@@ -11,6 +11,7 @@ import {
   getListBusinessesQueryKey,
   useListBusinessConversations,
   getListBusinessConversationsQueryKey,
+  customFetch,
 } from "@workspace/api-client-react";
 import { format } from "date-fns";
 import {
@@ -115,8 +116,8 @@ function QRConnectionPanel({ businessId, onConnected }: { businessId: number; on
     setErrorMsg(null);
 
     try {
-      const res = await fetch(`/api/sessions/${businessId}/start`, { method: "POST" });
-      if (!res.ok) throw new Error("Failed to start session");
+      const res = await customFetch(`/api/sessions/${businessId}/start`, { method: "POST" });
+      if (!res) throw new Error("Failed to start session");
       openStream(businessId);
     } catch {
       setPhase("error");
@@ -126,7 +127,7 @@ function QRConnectionPanel({ businessId, onConnected }: { businessId: number; on
 
   const disconnect = async () => {
     eventSourceRef.current?.close();
-    await fetch(`/api/sessions/${businessId}/disconnect`, { method: "POST" });
+    await customFetch(`/api/sessions/${businessId}/disconnect`, { method: "POST" });
     setPhase("idle");
     setQrDataUrl(null);
     setConnectedPhone(null);
@@ -241,15 +242,11 @@ function MetaConnectionPanel({ business, onSaved }: { business: { id: number; wh
   const save = async () => {
     setSaving(true);
     try {
-      const res = await fetch(`/api/businesses/${business.id}/connect-meta`, {
+      await customFetch(`/api/businesses/${business.id}/connect-meta`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(formData),
       });
-      if (!res.ok) {
-        const err = await res.json();
-        throw new Error(err.error ?? "Save failed");
-      }
       toast({ title: "Meta credentials saved", description: "Webhook is ready." });
       onSaved();
     } catch (err: unknown) {
@@ -590,7 +587,7 @@ export default function BusinessDetail() {
                       <p className="text-xs text-green-700 font-mono">+{business.connectedPhone}</p>
                     </div>
                     <Button variant="ghost" size="sm" className="ml-auto text-red-600" onClick={async () => {
-                      await fetch(`/api/sessions/${businessId}/disconnect`, { method: "POST" });
+                      await customFetch(`/api/sessions/${businessId}/disconnect`, { method: "POST" });
                       refreshBusiness();
                     }}>
                       <WifiOff className="w-3.5 h-3.5 mr-1" /> Disconnect

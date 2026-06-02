@@ -8,6 +8,7 @@ import {
   Store, Package, Loader2, ShoppingBag,
 } from "lucide-react";
 import { auth, loginWithGoogle, loginWithEmail, logout, onAuthChange } from "@/lib/firebase";
+import { customFetch } from "@workspace/api-client-react";
 import type { User } from "firebase/auth";
 import { format } from "date-fns";
 
@@ -50,8 +51,8 @@ export function FirebaseSyncTab({ businessId }: FirebaseSyncTabProps) {
   async function loadSyncStatus() {
     setLoadingStatus(true);
     try {
-      const res = await fetch(`/api/businesses/${businessId}/firebase-sync`);
-      if (res.ok) setSyncStatus(await res.json());
+      const data = await customFetch<SyncStatus>(`/api/businesses/${businessId}/firebase-sync`);
+      if (data) setSyncStatus(data);
     } catch { /* ignore */ } finally {
       setLoadingStatus(false);
     }
@@ -86,13 +87,11 @@ export function FirebaseSyncTab({ businessId }: FirebaseSyncTabProps) {
     if (!user) return;
     setSyncing(true);
     try {
-      const res = await fetch(`/api/businesses/${businessId}/firebase-sync`, {
+      const data = await customFetch<{ productssynced: number; store?: { name: string } }>(`/api/businesses/${businessId}/firebase-sync`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ firebaseUid: user.uid }),
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error ?? "Sync failed");
       toast({
         title: "Store synced!",
         description: `${data.productssynced} products imported from "${data.store?.name}".`,

@@ -338,7 +338,7 @@ export function ContactsTab({ businessId }: { businessId: number }) {
 
   const setTagMutation = useMutation({
     mutationFn: ({ conversationId, contactTag }: { conversationId: number; contactTag: string | null }) =>
-      customFetch(`/conversations/${conversationId}/contact-tag`, {
+      customFetch(`/api/conversations/${conversationId}/contact-tag`, {
         method: "PATCH",
         body: JSON.stringify({ contactTag }),
       }),

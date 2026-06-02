@@ -319,7 +319,7 @@ function ChatView({
 
   const resumeAI = useMutation({
     mutationFn: () =>
-      customFetch(`/conversations/${conv.id}/ai-state`, {
+      customFetch(`/api/conversations/${conv.id}/ai-state`, {
         method: "PATCH",
         body: JSON.stringify({ aiState: "AI_ACTIVE" }),
       }),
@@ -330,7 +330,7 @@ function ChatView({
 
   const dismissReview = useMutation({
     mutationFn: () =>
-      customFetch(`/conversations/${conv.id}/dismiss-review`, {
+      customFetch(`/api/conversations/${conv.id}/dismiss-review`, {
         method: "PATCH",
       }),
     onSuccess: () => {
@@ -340,7 +340,7 @@ function ChatView({
 
   const sendOwnerMessage = useMutation({
     mutationFn: (text: string) =>
-      customFetch(`/conversations/${conv.id}/owner-message`, {
+      customFetch(`/api/conversations/${conv.id}/owner-message`, {
         method: "POST",
         body: JSON.stringify({ text }),
       }),
@@ -625,13 +625,13 @@ export default function Inbox() {
   const { data: conversations, isLoading } = useQuery<ConversationListItem[]>({
     queryKey: ["conversations-all"],
     queryFn: () =>
-      customFetch<ConversationListItem[]>("/conversations/all", { responseType: "json" }),
+      customFetch<ConversationListItem[]>("/api/conversations/all", { responseType: "json" }),
     refetchInterval: 8000,
   });
 
   const setTagMutation = useMutation({
     mutationFn: ({ id, contactTag }: { id: number; contactTag: string | null }) =>
-      customFetch(`/conversations/${id}/contact-tag`, {
+      customFetch(`/api/conversations/${id}/contact-tag`, {
         method: "PATCH",
         body: JSON.stringify({ contactTag }),
       }),
@@ -642,7 +642,7 @@ export default function Inbox() {
 
   const setStateMutation = useMutation({
     mutationFn: ({ id, aiState }: { id: number; aiState: AiState }) =>
-      customFetch(`/conversations/${id}/ai-state`, {
+      customFetch(`/api/conversations/${id}/ai-state`, {
         method: "PATCH",
         body: JSON.stringify({ aiState }),
       }),

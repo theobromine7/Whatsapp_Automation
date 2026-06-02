@@ -13,9 +13,12 @@ import BusinessList from "@/pages/businesses/list";
 import NewBusiness from "@/pages/businesses/new";
 import BusinessDetail from "@/pages/businesses/detail";
 import ConnectWhatsApp from "@/pages/businesses/connect";
+import ConversationDetail from "@/pages/conversations/detail";
 import NotFound from "@/pages/not-found";
 
 const queryClient = new QueryClient();
+
+const FIREBASE_CONFIGURED = !!(import.meta.env.VITE_FIREBASE_API_KEY as string | undefined);
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
@@ -39,8 +42,12 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
 function Router() {
   return (
     <Switch>
+      {/* Root: skip landing and go straight to dashboard when auth is bypassed */}
+      <Route path="/">
+        {FIREBASE_CONFIGURED ? <Landing /> : <Redirect to="/dashboard" />}
+      </Route>
+
       {/* Public pages */}
-      <Route path="/" component={Landing} />
       <Route path="/login" component={Login} />
       <Route path="/signup" component={Signup} />
 
@@ -58,6 +65,7 @@ function Router() {
               <Route path="/businesses/new">
                 <PageLayout><NewBusiness /></PageLayout>
               </Route>
+              <Route path="/conversations/:businessId/:conversationId" component={ConversationDetail} />
               <Route path="/businesses/:id">
                 {() => <PageLayout><BusinessDetail /></PageLayout>}
               </Route>

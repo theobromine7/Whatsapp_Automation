@@ -30,6 +30,11 @@ export interface Business {
   sessionStatus?: string | null;
   /** @nullable */
   connectedPhone?: string | null;
+  /**
+     * JSON string — { enabled, timezone, openTime, closeTime, days }
+     * @nullable
+     */
+  businessHours?: string | null;
   createdAt: Date;
   updatedAt: Date;
 }

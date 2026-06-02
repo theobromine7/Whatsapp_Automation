@@ -1,11 +1,13 @@
 import { eq, and } from "drizzle-orm";
 import { db, businessesTable, whatsappConversationsTable, whatsappMessagesTable } from "@workspace/db";
-import { generateAIResponse } from "./agent";
+import { generateAIResponse, isWithinBusinessHours } from "./agent";
 import { sendWhatsappMessage, sendWhatsappImage } from "./whatsapp";
 import { generateUpiQr } from "./upi";
 import { logger } from "./logger";
 import { classifyContact, initialAiStateFromContactType, shouldAutoReply, isLowValueMessage } from "./lead-classifier";
 import type { Business } from "@workspace/db";
+
+const CONFIDENCE_THRESHOLD = 0.80;
 
 export async function handleIncomingMessage(opts: {
   business: Business;
@@ -62,25 +64,21 @@ export async function handleIncomingMessage(opts: {
     whatsappMessageId: whatsappMessageId ?? null,
   });
 
-  // ── Lead Classification ───────────────────────────────────────────────────
-  // Run on first message only (contactType not yet set) unless the state has
-  // already been set to PERSONAL_CONTACT or BLOCKED by a prior classification.
+  // ── Lead Classification (first message only) ──────────────────────────────
   let { contactType } = conversation;
   if (!contactType) {
     contactType = await classifyContact(messageText, customerName);
     const derivedState = initialAiStateFromContactType(contactType);
-
-    // Only update the state when it is still NEW_LEAD (don't downgrade
-    // OWNER_TAKEN_OVER or BLOCKED that may have been set previously).
     const stateUpdate =
-      conversation.aiState === "NEW_LEAD" ? { contactType, aiState: derivedState } : { contactType };
+      conversation.aiState === "NEW_LEAD"
+        ? { contactType, aiState: derivedState }
+        : { contactType };
 
     await db
       .update(whatsappConversationsTable)
       .set(stateUpdate)
       .where(eq(whatsappConversationsTable.id, conversation.id));
 
-    // Reflect locally so the guards below see the latest values
     conversation = { ...conversation, contactType, aiState: stateUpdate.aiState ?? conversation.aiState } as typeof conversation;
 
     logger.info(
@@ -88,30 +86,33 @@ export async function handleIncomingMessage(opts: {
       "Contact classified"
     );
   }
-  // ─────────────────────────────────────────────────────────────────────────
 
   // ── Conversation State Guard ──────────────────────────────────────────────
   if (!shouldAutoReply(conversation.aiState)) {
     logger.info(
-      { businessId: business.id, conversationId: conversation.id, customerPhone, aiState: conversation.aiState },
-      `AI reply suppressed — conversation state: ${conversation.aiState}`
+      { businessId: business.id, conversationId: conversation.id, aiState: conversation.aiState },
+      `AI reply suppressed — state: ${conversation.aiState}`
     );
     return;
   }
-  // ─────────────────────────────────────────────────────────────────────────
 
-  // ── Intent Filter (Feature 6) ─────────────────────────────────────────────
-  // Skip low-value acknowledgements with no business intent.
+  // ── Intent Filter — skip low-value acknowledgements ───────────────────────
   if (isLowValueMessage(messageText)) {
     logger.info(
-      { businessId: business.id, conversationId: conversation.id, customerPhone, messageText },
-      "Low-value message detected — AI reply suppressed"
+      { businessId: business.id, conversationId: conversation.id, messageText },
+      "Low-value message — AI reply suppressed"
     );
     return;
   }
-  // ─────────────────────────────────────────────────────────────────────────
 
-  // Generate AI response
+  // ── Business Hours Context ────────────────────────────────────────────────
+  const withinHours = isWithinBusinessHours(business.businessHours);
+  logger.info(
+    { businessId: business.id, conversationId: conversation.id, withinHours },
+    "Business hours check"
+  );
+
+  // Generate AI response (includes confidence score + intent)
   let aiResult: Awaited<ReturnType<typeof generateAIResponse>>;
   try {
     aiResult = await generateAIResponse(business, conversation.id, messageText);
@@ -123,24 +124,53 @@ export async function handleIncomingMessage(opts: {
     return;
   }
 
-  // Save AI text response
+  logger.info(
+    { businessId: business.id, conversationId: conversation.id, intent: aiResult.intent, confidence: aiResult.confidence },
+    "AI response generated"
+  );
+
+  // ── Confidence Check (Feature 7) ──────────────────────────────────────────
+  // Outside business hours, confidence threshold is relaxed — AI always handles.
+  const effectiveThreshold = withinHours ? CONFIDENCE_THRESHOLD : 0.50;
+
+  if (aiResult.confidence < effectiveThreshold) {
+    logger.info(
+      { businessId: business.id, conversationId: conversation.id, confidence: aiResult.confidence, threshold: effectiveThreshold, intent: aiResult.intent },
+      "Low-confidence response — marking for human review"
+    );
+    await db
+      .update(whatsappConversationsTable)
+      .set({
+        pendingHumanReview: true,
+        lastDetectedIntent: aiResult.intent,
+        updatedAt: new Date(),
+      })
+      .where(eq(whatsappConversationsTable.id, conversation.id));
+    return;
+  }
+
+  // ── Save and send AI reply ────────────────────────────────────────────────
   await db.insert(whatsappMessagesTable).values({
     conversationId: conversation.id,
     role: "assistant",
     content: aiResult.text,
   });
 
-  // Transition state: NEW_LEAD → AI_ACTIVE after first AI response
-  if (conversation.aiState === "NEW_LEAD") {
-    await db
-      .update(whatsappConversationsTable)
-      .set({ aiState: "AI_ACTIVE" })
-      .where(eq(whatsappConversationsTable.id, conversation.id));
-  }
+  // Clear any pending review flag when AI successfully replies
+  const stateTransition = conversation.aiState === "NEW_LEAD" ? "AI_ACTIVE" : conversation.aiState;
+  await db
+    .update(whatsappConversationsTable)
+    .set({
+      aiState: stateTransition,
+      pendingHumanReview: false,
+      lastDetectedIntent: aiResult.intent,
+      updatedAt: new Date(),
+    })
+    .where(eq(whatsappConversationsTable.id, conversation.id));
 
   await sendReply(aiResult.text);
 
-  // If purchase intent detected and store has UPI, send QR code
+  // If purchase intent + UPI configured → send QR code
   if (aiResult.purchaseIntent && business.upiId && business.storeName) {
     try {
       const qrBuffer = await generateUpiQr({
@@ -175,14 +205,14 @@ export async function handleIncomingMessage(opts: {
   }
 
   logger.info(
-    { businessId: business.id, conversationId: conversation.id, customerPhone },
+    { businessId: business.id, conversationId: conversation.id, customerPhone, intent: aiResult.intent, confidence: aiResult.confidence },
     "Message handled and reply sent"
   );
 }
 
 /**
- * Called when the business owner sends a message from their WhatsApp (fromMe).
- * Sets the conversation's aiState to OWNER_TAKEN_OVER so the AI stays silent.
+ * Called when the business owner sends a message (fromMe).
+ * Sets OWNER_TAKEN_OVER and clears any pending review flag.
  */
 export async function handleOwnerMessage(opts: {
   business: Business;
@@ -205,13 +235,13 @@ export async function handleOwnerMessage(opts: {
   if (conversation.aiState !== "OWNER_TAKEN_OVER") {
     logger.info(
       { businessId: opts.business.id, conversationId: conversation.id, customerPhone },
-      "Human takeover — AI silenced for this conversation"
+      "Human takeover — AI silenced"
     );
   }
 
   await db
     .update(whatsappConversationsTable)
-    .set({ aiState: "OWNER_TAKEN_OVER", ownerLastMessageAt: new Date() })
+    .set({ aiState: "OWNER_TAKEN_OVER", ownerLastMessageAt: new Date(), pendingHumanReview: false })
     .where(eq(whatsappConversationsTable.id, conversation.id));
 }
 

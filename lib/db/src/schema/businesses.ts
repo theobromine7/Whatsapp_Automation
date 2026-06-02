@@ -29,11 +29,15 @@ export const businessesTable = pgTable("businesses", {
   ownerUid: text("owner_uid"),
 
   // Advize Firebase store linkage
-  firebaseUid: text("firebase_uid"),       // owner_id from Firestore stores collection
-  upiId: text("upi_id"),                   // upi_id from Firestore store doc
-  storeSlug: text("store_slug"),           // slug from Firestore store doc
-  storeName: text("store_name"),           // store display name from Firestore
+  firebaseUid: text("firebase_uid"),
+  upiId: text("upi_id"),
+  storeSlug: text("store_slug"),
+  storeName: text("store_name"),
   lastSyncedAt: timestamp("last_synced_at", { withTimezone: true }),
+
+  // Business hours — JSON string (see BusinessHours type in message-handler)
+  // Format: { enabled, timezone, openTime, closeTime, days }
+  businessHours: text("business_hours"),
 
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow().$onUpdate(() => new Date()),

@@ -24,6 +24,13 @@ export interface WhatsappConversation {
      * @nullable
      */
   contactTag?: string | null;
+  /** true when AI confidence was below threshold — needs human attention */
+  pendingHumanReview?: boolean;
+  /**
+     * Last intent string detected by AI — shown to owner during review
+     * @nullable
+     */
+  lastDetectedIntent?: string | null;
   messageCount: number;
   /** @nullable */
   lastMessageAt?: Date | null;

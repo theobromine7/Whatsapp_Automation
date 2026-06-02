@@ -10,7 +10,6 @@ import {
   Search,
   MessageSquare,
   Bot,
-  Building2,
   UserCheck,
   Play,
   Tag,
@@ -20,6 +19,8 @@ import {
   Sparkles,
   Ban,
   User,
+  AlertTriangle,
+  X,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -53,6 +54,8 @@ interface ConversationListItem {
   messageCount: number;
   lastMessage: string | null;
   lastMessageAt: string | null;
+  pendingHumanReview: boolean;
+  lastDetectedIntent: string | null;
 }
 
 // ─── AI State Config ──────────────────────────────────────────────────────────
@@ -325,6 +328,16 @@ function ChatView({
     },
   });
 
+  const dismissReview = useMutation({
+    mutationFn: () =>
+      customFetch(`/conversations/${conv.id}/dismiss-review`, {
+        method: "PATCH",
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["conversations-all"] });
+    },
+  });
+
   const sendOwnerMessage = useMutation({
     mutationFn: (text: string) =>
       customFetch(`/conversations/${conv.id}/owner-message`, {
@@ -452,6 +465,32 @@ function ChatView({
         <div ref={bottomRef} />
       </div>
 
+      {/* Pending Review Banner */}
+      {conv.pendingHumanReview && (
+        <div className="bg-amber-50 border-b border-amber-200 px-4 py-2 flex items-start gap-2.5">
+          <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+          <div className="flex-1 min-w-0">
+            <p className="text-xs font-semibold text-amber-800">Needs your attention</p>
+            {conv.lastDetectedIntent && (
+              <p className="text-xs text-amber-700 truncate">
+                AI wasn't confident about: <span className="italic">{conv.lastDetectedIntent}</span>
+              </p>
+            )}
+            <p className="text-xs text-amber-600 mt-0.5">Reply manually or Resume AI to continue.</p>
+          </div>
+          <Button
+            size="sm"
+            variant="ghost"
+            className="h-6 w-6 p-0 shrink-0 text-amber-600 hover:bg-amber-100"
+            onClick={() => dismissReview.mutate()}
+            disabled={dismissReview.isPending}
+            title="Dismiss review flag"
+          >
+            <X className="w-3.5 h-3.5" />
+          </Button>
+        </div>
+      )}
+
       {/* Bottom bar — status strip + message input */}
       <div className="bg-[#f0f2f5] border-t border-[#e9edef] shrink-0">
         {/* Status strip */}
@@ -556,6 +595,9 @@ function ConvItem({
             {conv.lastMessage || `${conv.messageCount} messages`}
           </p>
           <div className="flex items-center gap-1 shrink-0">
+            {conv.pendingHumanReview && (
+              <span title="Needs review" className="w-2 h-2 rounded-full bg-amber-400 shrink-0" />
+            )}
             {label && (
               <span className={cn("text-[9px] border px-1 py-0.5 rounded-full leading-none", badgeStyle(conv))}>
                 {label}

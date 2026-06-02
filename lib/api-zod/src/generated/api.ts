@@ -35,6 +35,7 @@ export const ListBusinessesResponseItem = zod.object({
   "webhookVerifyToken": zod.string().nullish(),
   "sessionStatus": zod.string().nullish(),
   "connectedPhone": zod.string().nullish(),
+  "businessHours": zod.string().nullish().describe('JSON string — { enabled, timezone, openTime, closeTime, days }'),
   "createdAt": zod.coerce.date(),
   "updatedAt": zod.coerce.date()
 })
@@ -77,6 +78,7 @@ export const GetBusinessResponse = zod.object({
   "webhookVerifyToken": zod.string().nullish(),
   "sessionStatus": zod.string().nullish(),
   "connectedPhone": zod.string().nullish(),
+  "businessHours": zod.string().nullish().describe('JSON string — { enabled, timezone, openTime, closeTime, days }'),
   "createdAt": zod.coerce.date(),
   "updatedAt": zod.coerce.date()
 })
@@ -96,7 +98,8 @@ export const UpdateBusinessBody = zod.object({
   "systemPrompt": zod.string().optional(),
   "products": zod.string().optional(),
   "faqs": zod.string().optional(),
-  "isActive": zod.boolean().optional()
+  "isActive": zod.boolean().optional(),
+  "businessHours": zod.string().optional().describe('JSON string — { enabled, timezone, openTime, closeTime, days }')
 })
 
 export const UpdateBusinessResponse = zod.object({
@@ -115,6 +118,7 @@ export const UpdateBusinessResponse = zod.object({
   "webhookVerifyToken": zod.string().nullish(),
   "sessionStatus": zod.string().nullish(),
   "connectedPhone": zod.string().nullish(),
+  "businessHours": zod.string().nullish().describe('JSON string — { enabled, timezone, openTime, closeTime, days }'),
   "createdAt": zod.coerce.date(),
   "updatedAt": zod.coerce.date()
 })
@@ -151,6 +155,7 @@ export const ToggleBusinessResponse = zod.object({
   "webhookVerifyToken": zod.string().nullish(),
   "sessionStatus": zod.string().nullish(),
   "connectedPhone": zod.string().nullish(),
+  "businessHours": zod.string().nullish().describe('JSON string — { enabled, timezone, openTime, closeTime, days }'),
   "createdAt": zod.coerce.date(),
   "updatedAt": zod.coerce.date()
 })
@@ -186,6 +191,7 @@ export const ConnectBusinessMetaResponse = zod.object({
   "webhookVerifyToken": zod.string().nullish(),
   "sessionStatus": zod.string().nullish(),
   "connectedPhone": zod.string().nullish(),
+  "businessHours": zod.string().nullish().describe('JSON string — { enabled, timezone, openTime, closeTime, days }'),
   "createdAt": zod.coerce.date(),
   "updatedAt": zod.coerce.date()
 })
@@ -206,6 +212,8 @@ export const ListBusinessConversationsResponseItem = zod.object({
   "aiState": zod.string().optional().describe('Automation state: NEW_LEAD | AI_ACTIVE | OWNER_TAKEN_OVER | PERSONAL_CONTACT | BLOCKED'),
   "contactType": zod.string().nullish().describe('AI-classified contact type: SALES_LEAD | CUSTOMER | PERSONAL_CONTACT | FAMILY | STAFF | SUPPLIER | UNKNOWN'),
   "contactTag": zod.string().nullish().describe('Owner-set tag: PERSONAL | FAMILY | STAFF | SUPPLIER | CUSTOMER | LEAD'),
+  "pendingHumanReview": zod.boolean().optional().describe('true when AI confidence was below threshold — needs human attention'),
+  "lastDetectedIntent": zod.string().nullish().describe('Last intent string detected by AI — shown to owner during review'),
   "messageCount": zod.number(),
   "lastMessageAt": zod.coerce.date().nullish(),
   "createdAt": zod.coerce.date()
@@ -428,6 +436,8 @@ export const GetBusinessStatsResponse = zod.object({
   "aiState": zod.string().optional().describe('Automation state: NEW_LEAD | AI_ACTIVE | OWNER_TAKEN_OVER | PERSONAL_CONTACT | BLOCKED'),
   "contactType": zod.string().nullish().describe('AI-classified contact type: SALES_LEAD | CUSTOMER | PERSONAL_CONTACT | FAMILY | STAFF | SUPPLIER | UNKNOWN'),
   "contactTag": zod.string().nullish().describe('Owner-set tag: PERSONAL | FAMILY | STAFF | SUPPLIER | CUSTOMER | LEAD'),
+  "pendingHumanReview": zod.boolean().optional().describe('true when AI confidence was below threshold — needs human attention'),
+  "lastDetectedIntent": zod.string().nullish().describe('Last intent string detected by AI — shown to owner during review'),
   "messageCount": zod.number(),
   "lastMessageAt": zod.coerce.date().nullish(),
   "createdAt": zod.coerce.date()

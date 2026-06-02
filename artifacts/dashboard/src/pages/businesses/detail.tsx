@@ -35,6 +35,7 @@ import {
   Save,
   X,
   Store,
+  Clock,
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -363,6 +364,66 @@ export default function BusinessDetail() {
     );
   };
 
+  // ── Business Hours state ──
+  interface BusinessHoursDraft {
+    enabled: boolean;
+    timezone: string;
+    openTime: string;
+    closeTime: string;
+    days: number[];
+  }
+
+  const parseBusinessHours = (raw: string | null | undefined): BusinessHoursDraft => {
+    try {
+      if (raw) return JSON.parse(raw) as BusinessHoursDraft;
+    } catch { /* ignore */ }
+    return { enabled: false, timezone: "Asia/Kolkata", openTime: "09:00", closeTime: "21:00", days: [1, 2, 3, 4, 5, 6] };
+  };
+
+  const [editingHours, setEditingHours] = useState(false);
+  const [hoursDraft, setHoursDraft] = useState<BusinessHoursDraft>({ enabled: false, timezone: "Asia/Kolkata", openTime: "09:00", closeTime: "21:00", days: [1, 2, 3, 4, 5, 6] });
+
+  const startEditHours = () => {
+    setHoursDraft(parseBusinessHours(business?.businessHours));
+    setEditingHours(true);
+  };
+
+  const saveHours = () => {
+    updateBusiness.mutate(
+      { id: businessId, data: { businessHours: JSON.stringify(hoursDraft) } },
+      {
+        onSuccess: (data) => {
+          queryClient.setQueryData(getGetBusinessQueryKey(businessId), data);
+          setEditingHours(false);
+          toast({ title: "Business hours saved", description: "AI will adapt its behaviour based on these hours." });
+        },
+        onError: () => {
+          toast({ title: "Save failed", description: "Could not save business hours.", variant: "destructive" });
+        },
+      }
+    );
+  };
+
+  const TIMEZONES = [
+    { label: "India (IST)", value: "Asia/Kolkata" },
+    { label: "UAE (Gulf)", value: "Asia/Dubai" },
+    { label: "UK (GMT/BST)", value: "Europe/London" },
+    { label: "US Eastern", value: "America/New_York" },
+    { label: "US Pacific", value: "America/Los_Angeles" },
+    { label: "Singapore", value: "Asia/Singapore" },
+    { label: "Australia (AEDT)", value: "Australia/Sydney" },
+    { label: "UTC", value: "UTC" },
+  ];
+
+  const DAY_LABELS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+
+  const toggleDay = (day: number) => {
+    setHoursDraft((d) => ({
+      ...d,
+      days: d.days.includes(day) ? d.days.filter((x) => x !== day) : [...d.days, day].sort(),
+    }));
+  };
+
   const handleToggle = () => {
     toggleBot.mutate({ id: businessId }, {
       onSuccess: (data) => {
@@ -643,6 +704,162 @@ export default function BusinessDetail() {
 
         {/* ── Settings Tab ── */}
         <TabsContent value="settings" className="pt-4 space-y-4">
+
+          {/* Business Hours Card */}
+          <Card>
+            <CardHeader className="flex flex-row items-start justify-between gap-4 pb-4">
+              <div>
+                <CardTitle className="text-base flex items-center gap-2">
+                  <Clock className="w-4 h-4 text-primary" />
+                  Business Hours
+                </CardTitle>
+                <CardDescription className="mt-1">
+                  AI adapts its behaviour based on operating hours. Outside hours it focuses on lead capture.
+                </CardDescription>
+              </div>
+              {!editingHours && (
+                <Button variant="outline" size="sm" className="shrink-0 gap-1.5" onClick={startEditHours}>
+                  <Pencil className="w-3.5 h-3.5" /> Edit
+                </Button>
+              )}
+            </CardHeader>
+            <CardContent>
+              {editingHours ? (
+                <div className="space-y-5">
+                  {/* Enable toggle */}
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-medium">Enable business hours</p>
+                      <p className="text-xs text-muted-foreground">When off, AI treats all hours as operating hours.</p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setHoursDraft((d) => ({ ...d, enabled: !d.enabled }))}
+                      className={cn(
+                        "w-11 h-6 rounded-full transition-colors relative",
+                        hoursDraft.enabled ? "bg-primary" : "bg-muted-foreground/30"
+                      )}
+                    >
+                      <span className={cn(
+                        "w-5 h-5 rounded-full bg-white shadow absolute top-0.5 transition-transform",
+                        hoursDraft.enabled ? "translate-x-5" : "translate-x-0.5"
+                      )} />
+                    </button>
+                  </div>
+
+                  {hoursDraft.enabled && (
+                    <>
+                      {/* Timezone */}
+                      <div className="space-y-1.5">
+                        <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Timezone</label>
+                        <select
+                          className="w-full text-sm border rounded px-3 py-2 bg-background"
+                          value={hoursDraft.timezone}
+                          onChange={(e) => setHoursDraft((d) => ({ ...d, timezone: e.target.value }))}
+                        >
+                          {TIMEZONES.map((tz) => (
+                            <option key={tz.value} value={tz.value}>{tz.label}</option>
+                          ))}
+                        </select>
+                      </div>
+
+                      {/* Open/Close times */}
+                      <div className="grid grid-cols-2 gap-3">
+                        <div className="space-y-1.5">
+                          <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Opens at</label>
+                          <input
+                            type="time"
+                            className="w-full text-sm border rounded px-3 py-2 bg-background"
+                            value={hoursDraft.openTime}
+                            onChange={(e) => setHoursDraft((d) => ({ ...d, openTime: e.target.value }))}
+                          />
+                        </div>
+                        <div className="space-y-1.5">
+                          <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Closes at</label>
+                          <input
+                            type="time"
+                            className="w-full text-sm border rounded px-3 py-2 bg-background"
+                            value={hoursDraft.closeTime}
+                            onChange={(e) => setHoursDraft((d) => ({ ...d, closeTime: e.target.value }))}
+                          />
+                        </div>
+                      </div>
+
+                      {/* Days of week */}
+                      <div className="space-y-1.5">
+                        <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Open days</label>
+                        <div className="flex gap-1.5 flex-wrap">
+                          {DAY_LABELS.map((label, idx) => (
+                            <button
+                              key={idx}
+                              type="button"
+                              onClick={() => toggleDay(idx)}
+                              className={cn(
+                                "w-10 h-10 rounded-lg text-xs font-medium border transition-colors",
+                                hoursDraft.days.includes(idx)
+                                  ? "bg-primary text-primary-foreground border-primary"
+                                  : "bg-background text-muted-foreground border-border hover:border-primary/50"
+                              )}
+                            >
+                              {label}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    </>
+                  )}
+
+                  <div className="flex gap-2 pt-1">
+                    <Button size="sm" className="gap-1.5" onClick={saveHours} disabled={updateBusiness.isPending}>
+                      {updateBusiness.isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
+                      Save hours
+                    </Button>
+                    <Button size="sm" variant="ghost" className="gap-1.5" onClick={() => setEditingHours(false)} disabled={updateBusiness.isPending}>
+                      <X className="w-3.5 h-3.5" /> Cancel
+                    </Button>
+                  </div>
+                </div>
+              ) : (() => {
+                const h = parseBusinessHours(business.businessHours);
+                if (!h.enabled) {
+                  return (
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                      <span className="w-2 h-2 rounded-full bg-muted-foreground/40" />
+                      Business hours not configured — AI treats all hours equally.
+                    </div>
+                  );
+                }
+                const tzLabel = TIMEZONES.find((t) => t.value === h.timezone)?.label ?? h.timezone;
+                const dayNames = h.days.map((d) => DAY_LABELS[d]).join(", ");
+                return (
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2">
+                      <span className="w-2 h-2 rounded-full bg-green-500" />
+                      <span className="text-sm font-medium text-green-700">Hours configured</span>
+                    </div>
+                    <div className="bg-muted/50 rounded-lg border p-3 text-sm space-y-1">
+                      <div className="flex gap-2">
+                        <span className="text-muted-foreground w-20 text-xs">Hours</span>
+                        <span className="font-mono text-xs">{h.openTime} – {h.closeTime}</span>
+                      </div>
+                      <div className="flex gap-2">
+                        <span className="text-muted-foreground w-20 text-xs">Days</span>
+                        <span className="text-xs">{dayNames}</span>
+                      </div>
+                      <div className="flex gap-2">
+                        <span className="text-muted-foreground w-20 text-xs">Timezone</span>
+                        <span className="text-xs">{tzLabel}</span>
+                      </div>
+                    </div>
+                    <p className="text-xs text-muted-foreground">Outside these hours, AI captures leads and answers from the knowledge base.</p>
+                  </div>
+                );
+              })()}
+            </CardContent>
+          </Card>
+
+
+          {/* AI Configuration Card */}
           <Card>
             <CardHeader className="flex flex-row items-start justify-between gap-4 pb-4">
               <div>

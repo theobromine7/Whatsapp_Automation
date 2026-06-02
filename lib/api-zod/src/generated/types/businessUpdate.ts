@@ -14,4 +14,6 @@ export interface BusinessUpdate {
   products?: string;
   faqs?: string;
   isActive?: boolean;
+  /** JSON string — { enabled, timezone, openTime, closeTime, days } */
+  businessHours?: string;
 }

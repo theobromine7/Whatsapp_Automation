@@ -1,4 +1,4 @@
-import { pgTable, text, serial, timestamp, integer } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, timestamp, integer, boolean } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 import { businessesTable } from "./businesses";
@@ -43,21 +43,20 @@ export const whatsappConversationsTable = pgTable("whatsapp_conversations", {
   customerName: text("customer_name"),
 
   // Conversation automation state
-  // NEW_LEAD         — first contact, AI has not yet responded
-  // AI_ACTIVE        — AI is handling replies
-  // OWNER_TAKEN_OVER — owner replied manually; AI silent (30-min auto-resume)
-  // PERSONAL_CONTACT — classified as personal/family/staff/supplier; AI never replies
-  // BLOCKED          — permanently blocked; AI never replies
   aiState: text("ai_state").notNull().$type<AiState>().default("NEW_LEAD"),
 
-  // When the owner last sent a message in this conversation (used for 30-min auto-resume)
+  // When the owner last sent a message (used for 30-min auto-resume)
   ownerLastMessageAt: timestamp("owner_last_message_at", { withTimezone: true }),
 
-  // Conversation Control Layer
   // AI-classified contact type (set on first message using Gemini)
   contactType: text("contact_type").$type<ContactType>(),
   // Manually set by owner to permanently tag a contact
   contactTag: text("contact_tag").$type<ContactTag>(),
+
+  // Set to true when AI confidence < 0.80 — conversation needs human review
+  pendingHumanReview: boolean("pending_human_review").notNull().default(false),
+  // Last intent detected by AI (for review context)
+  lastDetectedIntent: text("last_detected_intent"),
 
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow().$onUpdate(() => new Date()),

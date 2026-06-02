@@ -37,6 +37,11 @@ export interface Business {
   sessionStatus?: string | null;
   /** @nullable */
   connectedPhone?: string | null;
+  /**
+     * JSON string — { enabled, timezone, openTime, closeTime, days }
+     * @nullable
+     */
+  businessHours?: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -58,6 +63,8 @@ export interface BusinessUpdate {
   products?: string;
   faqs?: string;
   isActive?: boolean;
+  /** JSON string — { enabled, timezone, openTime, closeTime, days } */
+  businessHours?: string;
 }
 
 export interface MetaCredentials {
@@ -85,6 +92,13 @@ export interface WhatsappConversation {
      * @nullable
      */
   contactTag?: string | null;
+  /** true when AI confidence was below threshold — needs human attention */
+  pendingHumanReview?: boolean;
+  /**
+     * Last intent string detected by AI — shown to owner during review
+     * @nullable
+     */
+  lastDetectedIntent?: string | null;
   messageCount: number;
   /** @nullable */
   lastMessageAt?: string | null;

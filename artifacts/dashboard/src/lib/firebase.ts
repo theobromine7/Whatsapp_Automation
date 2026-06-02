@@ -13,16 +13,17 @@ import {
 } from "firebase/auth";
 
 const apiKey = import.meta.env.VITE_FIREBASE_API_KEY as string | undefined;
+const projectId = import.meta.env.VITE_FIREBASE_PROJECT_ID as string | undefined;
 
 let _app: FirebaseApp | null = null;
 let _auth: Auth | null = null;
 
-if (apiKey) {
+if (apiKey && projectId) {
   const firebaseConfig = {
     apiKey,
-    authDomain: "studio-1871371743-58ae3.firebaseapp.com",
-    projectId: "studio-1871371743-58ae3",
-    storageBucket: "studio-1871371743-58ae3.firebasestorage.app",
+    authDomain: `${projectId}.firebaseapp.com`,
+    projectId,
+    storageBucket: `${projectId}.firebasestorage.app`,
   };
   _app = getApps().length ? getApps()[0]! : initializeApp(firebaseConfig);
   _auth = getAuth(_app);

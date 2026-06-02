@@ -1,0 +1,1 @@
+- [Firebase auth bypass pattern](firebase-auth-bypass.md) — dev bypass in auth-middleware.ts + AuthContext.tsx; real auth re-enables by setting two secrets, zero code changes.

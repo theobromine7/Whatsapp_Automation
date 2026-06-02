@@ -12,6 +12,18 @@ declare global {
 }
 
 export async function requireAuth(req: Request, res: Response, next: NextFunction): Promise<void> {
+  // ── Dev bypass ───────────────────────────────────────────────────────────
+  // When FIREBASE_SERVICE_ACCOUNT_JSON is not set, Firebase is not initialised.
+  // In that case we skip token verification and inject a constant dev UID so
+  // all ownerUid-scoped queries continue to work.
+  // To enable real auth, set FIREBASE_SERVICE_ACCOUNT_JSON in your secrets.
+  if (getApps().length === 0) {
+    req.user = { uid: "dev-bypass" };
+    next();
+    return;
+  }
+  // ─────────────────────────────────────────────────────────────────────────
+
   const header = req.headers.authorization;
   if (!header?.startsWith("Bearer ")) {
     res.status(401).json({ error: "Unauthorized" });
@@ -19,11 +31,6 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
   }
 
   const token = header.slice(7);
-
-  if (getApps().length === 0) {
-    res.status(503).json({ error: "Authentication service unavailable" });
-    return;
-  }
 
   try {
     const decoded = await getAuth().verifyIdToken(token);

@@ -16,6 +16,7 @@ import {
   Tag,
   ShieldOff,
   ChevronDown,
+  Send,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -188,7 +189,9 @@ function ChatView({
   onTagChange: (tag: string | null) => void;
 }) {
   const bottomRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
   const queryClient = useQueryClient();
+  const [inputText, setInputText] = useState("");
 
   const isTakenOver = conv.aiState === "OWNER_TAKEN_OVER";
   const blocked = isAutoReplyBlocked(conv);
@@ -211,6 +214,32 @@ function ChatView({
       queryClient.invalidateQueries({ queryKey: ["conversations-all"] });
     },
   });
+
+  const sendOwnerMessage = useMutation({
+    mutationFn: (text: string) =>
+      customFetch(`/conversations/${conv.id}/owner-message`, {
+        method: "POST",
+        body: JSON.stringify({ text }),
+      }),
+    onSuccess: () => {
+      setInputText("");
+      queryClient.invalidateQueries({ queryKey: getListConversationMessagesQueryKey(conv.id) });
+      queryClient.invalidateQueries({ queryKey: ["conversations-all"] });
+    },
+  });
+
+  const handleSend = () => {
+    const text = inputText.trim();
+    if (!text || sendOwnerMessage.isPending) return;
+    sendOwnerMessage.mutate(text);
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      handleSend();
+    }
+  };
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -286,6 +315,8 @@ function ChatView({
         ) : (
           messages.map((msg, i) => {
             const isAI = msg.role === "assistant";
+            const isOwner = msg.role === "owner";
+            const isRight = isAI || isOwner;
             const prevMsg = messages[i - 1];
             const showTime = !prevMsg || new Date(msg.createdAt).getTime() - new Date(prevMsg.createdAt).getTime() > 5 * 60 * 1000;
 
@@ -298,23 +329,24 @@ function ChatView({
                     </span>
                   </div>
                 )}
-                <div className={cn("flex mb-0.5", isAI ? "justify-end" : "justify-start")}>
+                <div className={cn("flex mb-0.5", isRight ? "justify-end" : "justify-start")}>
                   <div
                     className={cn(
-                      "max-w-[65%] rounded-2xl px-3 py-2 text-sm shadow-sm relative",
-                      isAI
+                      "max-w-[65%] rounded-2xl px-3 py-2 text-sm shadow-sm",
+                      isOwner
+                        ? "bg-[#2a3942] text-white rounded-br-sm"
+                        : isAI
                         ? "bg-[#d9fdd3] text-[#111b21] rounded-br-sm"
                         : "bg-white text-[#111b21] rounded-bl-sm"
                     )}
                   >
                     <p className="whitespace-pre-wrap break-words leading-relaxed">{msg.content}</p>
-                    <div className={cn("flex items-center gap-1 mt-0.5", isAI ? "justify-end" : "justify-start")}>
-                      <span className="text-[10px] text-[#667781]">
+                    <div className={cn("flex items-center gap-1 mt-0.5", isRight ? "justify-end" : "justify-start")}>
+                      <span className={cn("text-[10px]", isOwner ? "text-white/60" : "text-[#667781]")}>
                         {format(new Date(msg.createdAt), "h:mm a")}
                       </span>
-                      {isAI && (
-                        <Bot className="w-2.5 h-2.5 text-[#667781]" />
-                      )}
+                      {isAI && <Bot className="w-2.5 h-2.5 text-[#667781]" />}
+                      {isOwner && <UserCheck className="w-2.5 h-2.5 text-white/60" />}
                     </div>
                   </div>
                 </div>
@@ -325,45 +357,66 @@ function ChatView({
         <div ref={bottomRef} />
       </div>
 
-      {/* Status bar / action area */}
-      <div className="px-4 py-3 bg-[#f0f2f5] border-t border-[#e9edef] shrink-0">
-        {blocked ? (
-          <div className="bg-gray-50 border border-gray-200 rounded-xl px-4 py-2.5 flex items-center gap-3">
-            <ShieldOff className="w-4 h-4 text-gray-400 shrink-0" />
-            <span className="text-sm text-gray-500 flex-1">
-              Auto-reply disabled — this contact is tagged as <span className="font-medium">{conv.contactTag ?? conv.contactType?.replace("_", " ").toLowerCase()}</span>
-            </span>
-          </div>
-        ) : isTakenOver ? (
-          <div className="bg-orange-50 border border-orange-200 rounded-xl px-4 py-2.5 flex items-center justify-between gap-3">
-            <div className="flex items-center gap-2 min-w-0">
-              <UserCheck className="w-4 h-4 text-orange-500 shrink-0" />
-              <span className="text-sm text-orange-700 truncate">
-                AI paused — you're handling this chat
-                {conv.ownerLastMessageAt && (
-                  <span className="text-orange-400 ml-1 text-xs">
-                    · resumes automatically in 30 min
-                  </span>
-                )}
-              </span>
+      {/* Bottom bar — status strip + message input */}
+      <div className="bg-[#f0f2f5] border-t border-[#e9edef] shrink-0">
+        {/* Status strip */}
+        <div className="px-4 pt-2 pb-1 flex items-center justify-between gap-3">
+          {blocked ? (
+            <div className="flex items-center gap-2 text-xs text-gray-500">
+              <ShieldOff className="w-3.5 h-3.5 text-gray-400 shrink-0" />
+              Auto-reply off — tagged as <span className="font-medium">{conv.contactTag ?? conv.contactType?.replace("_", " ").toLowerCase()}</span>
             </div>
+          ) : isTakenOver ? (
+            <div className="flex items-center gap-2 text-xs text-orange-700">
+              <UserCheck className="w-3.5 h-3.5 text-orange-500 shrink-0" />
+              <span>You're handling this chat · AI resumes in 30 min</span>
+            </div>
+          ) : (
+            <div className="flex items-center gap-2 text-xs text-[#8696a0]">
+              <Bot className="w-3.5 h-3.5 text-primary/60 shrink-0" />
+              <span>AI agent is handling replies automatically</span>
+            </div>
+          )}
+
+          {isTakenOver && (
             <Button
               size="sm"
               variant="outline"
-              className="border-orange-300 text-orange-700 hover:bg-orange-100 shrink-0 h-7 text-xs gap-1"
+              className="border-orange-300 text-orange-700 hover:bg-orange-100 shrink-0 h-6 text-xs gap-1 px-2"
               onClick={() => resumeAI.mutate()}
               disabled={resumeAI.isPending}
             >
               <Play className="w-3 h-3" />
               Resume AI
             </Button>
-          </div>
-        ) : (
-          <div className="bg-white rounded-full px-4 py-2.5 text-sm text-[#8696a0] flex items-center justify-between">
-            <span>AI agent is handling this conversation automatically</span>
-            <Bot className="w-4 h-4 text-primary/60" />
-          </div>
-        )}
+          )}
+        </div>
+
+        {/* Message input */}
+        <div className="px-3 pb-3 flex items-end gap-2">
+          <textarea
+            ref={inputRef}
+            rows={1}
+            value={inputText}
+            onChange={(e) => {
+              setInputText(e.target.value);
+              e.target.style.height = "auto";
+              e.target.style.height = Math.min(e.target.scrollHeight, 120) + "px";
+            }}
+            onKeyDown={handleKeyDown}
+            placeholder="Type a reply… (Enter to send, Shift+Enter for new line)"
+            className="flex-1 bg-white rounded-2xl px-4 py-2.5 text-sm text-[#111b21] placeholder-[#8696a0] outline-none border border-[#e9edef] resize-none overflow-hidden leading-relaxed"
+            style={{ minHeight: "42px" }}
+          />
+          <Button
+            size="icon"
+            className="w-10 h-10 rounded-full shrink-0"
+            onClick={handleSend}
+            disabled={!inputText.trim() || sendOwnerMessage.isPending}
+          >
+            <Send className="w-4 h-4" />
+          </Button>
+        </div>
       </div>
     </div>
   );

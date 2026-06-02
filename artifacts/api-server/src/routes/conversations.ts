@@ -9,6 +9,7 @@ import {
   ListConversationMessagesResponse,
 } from "@workspace/api-zod";
 import { requireAuth } from "../lib/auth-middleware";
+import { logger } from "../lib/logger";
 
 const router: IRouter = Router();
 
@@ -211,6 +212,80 @@ router.get("/conversations/:id/messages", requireAuth, async (req, res): Promise
     .orderBy(whatsappMessagesTable.createdAt);
 
   res.json(ListConversationMessagesResponse.parse(messages));
+});
+
+// ── Owner sends a message from the dashboard ─────────────────────────────────
+// Immediately sets OWNER_TAKEN_OVER and dispatches the text to WhatsApp.
+router.post("/conversations/:id/owner-message", requireAuth, async (req, res): Promise<void> => {
+  const id = parseInt(String(req.params["id"] ?? ""), 10);
+  if (isNaN(id)) {
+    res.status(400).json({ error: "Invalid conversation ID" });
+    return;
+  }
+
+  const text = typeof req.body?.text === "string" ? req.body.text.trim() : "";
+  if (!text) {
+    res.status(400).json({ error: "text is required" });
+    return;
+  }
+
+  const [conv] = await db
+    .select()
+    .from(whatsappConversationsTable)
+    .where(eq(whatsappConversationsTable.id, id));
+
+  if (!conv) {
+    res.status(404).json({ error: "Conversation not found" });
+    return;
+  }
+
+  const [business] = await db
+    .select()
+    .from(businessesTable)
+    .where(and(eq(businessesTable.id, conv.businessId), eq(businessesTable.ownerUid, req.user!.uid)));
+
+  if (!business) {
+    res.status(403).json({ error: "Access denied" });
+    return;
+  }
+
+  // 1. Human takeover — silence AI
+  await db
+    .update(whatsappConversationsTable)
+    .set({ aiState: "OWNER_TAKEN_OVER", ownerLastMessageAt: new Date() })
+    .where(eq(whatsappConversationsTable.id, id));
+
+  // 2. Persist the owner message
+  const [message] = await db
+    .insert(whatsappMessagesTable)
+    .values({ conversationId: id, role: "owner", content: text })
+    .returning();
+
+  // 3. Best-effort WhatsApp dispatch (non-blocking)
+  setImmediate(async () => {
+    try {
+      if (
+        business.connectionType === "meta_cloud" &&
+        business.whatsappPhoneNumberId &&
+        business.whatsappAccessToken
+      ) {
+        const { sendWhatsappMessage } = await import("../lib/whatsapp");
+        await sendWhatsappMessage(
+          business.whatsappPhoneNumberId,
+          business.whatsappAccessToken,
+          conv.customerPhone,
+          text
+        );
+      } else if (business.connectionType === "qr_session") {
+        const { sendMessageViaSession } = await import("../lib/session-manager");
+        await sendMessageViaSession(business.id, conv.customerJid ?? conv.customerPhone, text);
+      }
+    } catch (err) {
+      logger.warn({ err, businessId: business.id, conversationId: id }, "Owner WhatsApp dispatch failed (non-fatal)");
+    }
+  });
+
+  res.status(201).json(message);
 });
 
 export default router;

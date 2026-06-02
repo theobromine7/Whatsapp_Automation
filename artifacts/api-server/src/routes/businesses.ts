@@ -28,12 +28,17 @@ async function getOwnedBusiness(id: number, uid: string) {
 }
 
 router.get("/businesses", requireAuth, async (req, res): Promise<void> => {
-  const businesses = await db
-    .select()
-    .from(businessesTable)
-    .where(eq(businessesTable.ownerUid, req.user!.uid))
-    .orderBy(businessesTable.createdAt);
-  res.json(ListBusinessesResponse.parse(businesses));
+  try {
+    const businesses = await db
+      .select()
+      .from(businessesTable)
+      .where(eq(businessesTable.ownerUid, req.user!.uid))
+      .orderBy(businessesTable.createdAt);
+    res.json(ListBusinessesResponse.parse(businesses));
+  } catch (err) {
+    req.log.error({ err }, "Failed to list businesses");
+    res.status(500).json({ error: "Failed to list businesses" });
+  }
 });
 
 router.post("/businesses", requireAuth, async (req, res): Promise<void> => {
@@ -44,11 +49,16 @@ router.post("/businesses", requireAuth, async (req, res): Promise<void> => {
     return;
   }
 
-  const [business] = await db
-    .insert(businessesTable)
-    .values({ ...parsed.data, connectionType: "pending", ownerUid: req.user!.uid })
-    .returning();
-  res.status(201).json(GetBusinessResponse.parse(business));
+  try {
+    const [business] = await db
+      .insert(businessesTable)
+      .values({ ...parsed.data, connectionType: "pending", ownerUid: req.user!.uid })
+      .returning();
+    res.status(201).json(GetBusinessResponse.parse(business));
+  } catch (err) {
+    req.log.error({ err }, "Failed to create business");
+    res.status(500).json({ error: "Failed to create business" });
+  }
 });
 
 router.get("/businesses/:id", requireAuth, async (req, res): Promise<void> => {
@@ -58,13 +68,17 @@ router.get("/businesses/:id", requireAuth, async (req, res): Promise<void> => {
     return;
   }
 
-  const business = await getOwnedBusiness(params.data.id, req.user!.uid);
-  if (!business) {
-    res.status(404).json({ error: "Business not found" });
-    return;
+  try {
+    const business = await getOwnedBusiness(params.data.id, req.user!.uid);
+    if (!business) {
+      res.status(404).json({ error: "Business not found" });
+      return;
+    }
+    res.json(GetBusinessResponse.parse(business));
+  } catch (err) {
+    req.log.error({ err }, "Failed to fetch business");
+    res.status(500).json({ error: "Failed to fetch business" });
   }
-
-  res.json(GetBusinessResponse.parse(business));
 });
 
 router.patch("/businesses/:id", requireAuth, async (req, res): Promise<void> => {
@@ -80,19 +94,24 @@ router.patch("/businesses/:id", requireAuth, async (req, res): Promise<void> => 
     return;
   }
 
-  const existing = await getOwnedBusiness(params.data.id, req.user!.uid);
-  if (!existing) {
-    res.status(404).json({ error: "Business not found" });
-    return;
+  try {
+    const existing = await getOwnedBusiness(params.data.id, req.user!.uid);
+    if (!existing) {
+      res.status(404).json({ error: "Business not found" });
+      return;
+    }
+
+    const [business] = await db
+      .update(businessesTable)
+      .set({ ...parsed.data, updatedAt: new Date() })
+      .where(eq(businessesTable.id, params.data.id))
+      .returning();
+
+    res.json(UpdateBusinessResponse.parse(business));
+  } catch (err) {
+    req.log.error({ err }, "Failed to update business");
+    res.status(500).json({ error: "Failed to update business" });
   }
-
-  const [business] = await db
-    .update(businessesTable)
-    .set({ ...parsed.data, updatedAt: new Date() })
-    .where(eq(businessesTable.id, params.data.id))
-    .returning();
-
-  res.json(UpdateBusinessResponse.parse(business));
 });
 
 router.delete("/businesses/:id", requireAuth, async (req, res): Promise<void> => {
@@ -102,14 +121,19 @@ router.delete("/businesses/:id", requireAuth, async (req, res): Promise<void> =>
     return;
   }
 
-  const existing = await getOwnedBusiness(params.data.id, req.user!.uid);
-  if (!existing) {
-    res.status(404).json({ error: "Business not found" });
-    return;
-  }
+  try {
+    const existing = await getOwnedBusiness(params.data.id, req.user!.uid);
+    if (!existing) {
+      res.status(404).json({ error: "Business not found" });
+      return;
+    }
 
-  await db.delete(businessesTable).where(eq(businessesTable.id, params.data.id));
-  res.sendStatus(204);
+    await db.delete(businessesTable).where(eq(businessesTable.id, params.data.id));
+    res.sendStatus(204);
+  } catch (err) {
+    req.log.error({ err }, "Failed to delete business");
+    res.status(500).json({ error: "Failed to delete business" });
+  }
 });
 
 router.patch("/businesses/:id/toggle", requireAuth, async (req, res): Promise<void> => {
@@ -119,19 +143,24 @@ router.patch("/businesses/:id/toggle", requireAuth, async (req, res): Promise<vo
     return;
   }
 
-  const existing = await getOwnedBusiness(params.data.id, req.user!.uid);
-  if (!existing) {
-    res.status(404).json({ error: "Business not found" });
-    return;
+  try {
+    const existing = await getOwnedBusiness(params.data.id, req.user!.uid);
+    if (!existing) {
+      res.status(404).json({ error: "Business not found" });
+      return;
+    }
+
+    const [business] = await db
+      .update(businessesTable)
+      .set({ isActive: !existing.isActive, updatedAt: new Date() })
+      .where(eq(businessesTable.id, params.data.id))
+      .returning();
+
+    res.json(ToggleBusinessResponse.parse(business));
+  } catch (err) {
+    req.log.error({ err }, "Failed to toggle business");
+    res.status(500).json({ error: "Failed to toggle business" });
   }
-
-  const [business] = await db
-    .update(businessesTable)
-    .set({ isActive: !existing.isActive, updatedAt: new Date() })
-    .where(eq(businessesTable.id, params.data.id))
-    .returning();
-
-  res.json(ToggleBusinessResponse.parse(business));
 });
 
 router.post("/businesses/:id/connect-meta", requireAuth, async (req, res): Promise<void> => {
@@ -147,25 +176,30 @@ router.post("/businesses/:id/connect-meta", requireAuth, async (req, res): Promi
     return;
   }
 
-  const existing = await getOwnedBusiness(params.data.id, req.user!.uid);
-  if (!existing) {
-    res.status(404).json({ error: "Business not found" });
-    return;
+  try {
+    const existing = await getOwnedBusiness(params.data.id, req.user!.uid);
+    if (!existing) {
+      res.status(404).json({ error: "Business not found" });
+      return;
+    }
+
+    const [business] = await db
+      .update(businessesTable)
+      .set({
+        ...parsed.data,
+        connectionType: "meta_cloud",
+        sessionStatus: null,
+        connectedPhone: null,
+        updatedAt: new Date(),
+      })
+      .where(eq(businessesTable.id, params.data.id))
+      .returning();
+
+    res.json(GetBusinessResponse.parse(business));
+  } catch (err) {
+    req.log.error({ err }, "Failed to connect Meta");
+    res.status(500).json({ error: "Failed to connect Meta" });
   }
-
-  const [business] = await db
-    .update(businessesTable)
-    .set({
-      ...parsed.data,
-      connectionType: "meta_cloud",
-      sessionStatus: null,
-      connectedPhone: null,
-      updatedAt: new Date(),
-    })
-    .where(eq(businessesTable.id, params.data.id))
-    .returning();
-
-  res.json(GetBusinessResponse.parse(business));
 });
 
 export default router;

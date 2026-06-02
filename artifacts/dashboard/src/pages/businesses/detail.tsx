@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { useRoute, Link, useLocation } from "wouter";
 import { useQueryClient } from "@tanstack/react-query";
+import { auth } from "@/lib/firebase";
 import {
   getGetBusinessQueryKey,
   useGetBusiness,
@@ -68,9 +69,15 @@ function QRConnectionPanel({ businessId, onConnected }: { businessId: number; on
   const eventSourceRef = useRef<EventSource | null>(null);
   const { toast } = useToast();
 
-  const openStream = (bId: number) => {
+  const openStream = async (bId: number) => {
     eventSourceRef.current?.close();
-    const es = new EventSource(`/api/sessions/${bId}/qr-stream`);
+    // EventSource cannot send custom headers — pass the Firebase token as a query param instead
+    let tokenParam = "";
+    try {
+      const token = await auth?.currentUser?.getIdToken();
+      if (token) tokenParam = `?token=${encodeURIComponent(token)}`;
+    } catch { /* proceed without token (dev bypass will handle it) */ }
+    const es = new EventSource(`/api/sessions/${bId}/qr-stream${tokenParam}`);
     eventSourceRef.current = es;
 
     es.onmessage = (e) => {

@@ -1,8 +1,9 @@
 import { Router, type IRouter } from "express";
+import { requireAuth } from "../lib/auth-middleware";
 
 const router: IRouter = Router();
 
-router.post("/businesses/test-connection", async (req, res): Promise<void> => {
+router.post("/businesses/test-connection", requireAuth, async (req, res): Promise<void> => {
   const { whatsappPhoneNumberId, whatsappAccessToken } = req.body;
 
   if (!whatsappPhoneNumberId || !whatsappAccessToken) {

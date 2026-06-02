@@ -4,7 +4,7 @@ import { generateAIResponse } from "./agent";
 import { sendWhatsappMessage, sendWhatsappImage } from "./whatsapp";
 import { generateUpiQr } from "./upi";
 import { logger } from "./logger";
-import { classifyContact, shouldAutoReply } from "./lead-classifier";
+import { classifyContact, initialAiStateFromContactType, shouldAutoReply, isLowValueMessage } from "./lead-classifier";
 import type { Business } from "@workspace/db";
 
 export async function handleIncomingMessage(opts: {
@@ -19,7 +19,7 @@ export async function handleIncomingMessage(opts: {
 }): Promise<void> {
   const { business, customerPhone, customerJid, customerName, messageText, whatsappMessageId, sendReply, sendImage } = opts;
 
-  // Upsert conversation
+  // ── Upsert conversation ───────────────────────────────────────────────────
   let [conversation] = await db
     .select()
     .from(whatsappConversationsTable)
@@ -33,7 +33,13 @@ export async function handleIncomingMessage(opts: {
   if (!conversation) {
     const [newConv] = await db
       .insert(whatsappConversationsTable)
-      .values({ businessId: business.id, customerPhone, customerJid: customerJid ?? null, customerName })
+      .values({
+        businessId: business.id,
+        customerPhone,
+        customerJid: customerJid ?? null,
+        customerName,
+        aiState: "NEW_LEAD",
+      })
       .returning();
     conversation = newConv!;
   } else {
@@ -56,44 +62,50 @@ export async function handleIncomingMessage(opts: {
     whatsappMessageId: whatsappMessageId ?? null,
   });
 
-  // Mark conversation as active
-  await db
-    .update(whatsappConversationsTable)
-    .set({ updatedAt: new Date() })
-    .where(eq(whatsappConversationsTable.id, conversation.id));
-
   // ── Lead Classification ───────────────────────────────────────────────────
-  // Classify on the first message (contactType not yet set) unless a manual
-  // contactTag is already present (owner override takes full precedence).
-  let contactType = conversation.contactType;
-  if (!contactType && !conversation.contactTag) {
+  // Run on first message only (contactType not yet set) unless the state has
+  // already been set to PERSONAL_CONTACT or BLOCKED by a prior classification.
+  let { contactType } = conversation;
+  if (!contactType) {
     contactType = await classifyContact(messageText, customerName);
+    const derivedState = initialAiStateFromContactType(contactType);
+
+    // Only update the state when it is still NEW_LEAD (don't downgrade
+    // OWNER_TAKEN_OVER or BLOCKED that may have been set previously).
+    const stateUpdate =
+      conversation.aiState === "NEW_LEAD" ? { contactType, aiState: derivedState } : { contactType };
+
     await db
       .update(whatsappConversationsTable)
-      .set({ contactType })
+      .set(stateUpdate)
       .where(eq(whatsappConversationsTable.id, conversation.id));
+
+    // Reflect locally so the guards below see the latest values
+    conversation = { ...conversation, contactType, aiState: stateUpdate.aiState ?? conversation.aiState } as typeof conversation;
+
     logger.info(
-      { businessId: business.id, conversationId: conversation.id, customerPhone, contactType },
+      { businessId: business.id, conversationId: conversation.id, customerPhone, contactType, aiState: conversation.aiState },
       "Contact classified"
     );
   }
   // ─────────────────────────────────────────────────────────────────────────
 
-  // ── Conversation Control Guard ────────────────────────────────────────────
-  // 1. Human takeover: owner manually replied — AI stays silent until 30-min auto-resume.
-  if (conversation.aiState === "OWNER_TAKEN_OVER") {
+  // ── Conversation State Guard ──────────────────────────────────────────────
+  if (!shouldAutoReply(conversation.aiState)) {
     logger.info(
-      { businessId: business.id, conversationId: conversation.id, customerPhone },
-      "Conversation in OWNER_TAKEN_OVER state — AI reply suppressed"
+      { businessId: business.id, conversationId: conversation.id, customerPhone, aiState: conversation.aiState },
+      `AI reply suppressed — conversation state: ${conversation.aiState}`
     );
     return;
   }
+  // ─────────────────────────────────────────────────────────────────────────
 
-  // 2. Contact filter: skip auto-reply for personal/family/staff/supplier contacts.
-  if (!shouldAutoReply(contactType, conversation.contactTag)) {
+  // ── Intent Filter (Feature 6) ─────────────────────────────────────────────
+  // Skip low-value acknowledgements with no business intent.
+  if (isLowValueMessage(messageText)) {
     logger.info(
-      { businessId: business.id, conversationId: conversation.id, customerPhone, contactType, contactTag: conversation.contactTag },
-      "Contact type/tag not eligible for auto-reply — AI reply suppressed"
+      { businessId: business.id, conversationId: conversation.id, customerPhone, messageText },
+      "Low-value message detected — AI reply suppressed"
     );
     return;
   }
@@ -117,6 +129,14 @@ export async function handleIncomingMessage(opts: {
     role: "assistant",
     content: aiResult.text,
   });
+
+  // Transition state: NEW_LEAD → AI_ACTIVE after first AI response
+  if (conversation.aiState === "NEW_LEAD") {
+    await db
+      .update(whatsappConversationsTable)
+      .set({ aiState: "AI_ACTIVE" })
+      .where(eq(whatsappConversationsTable.id, conversation.id));
+  }
 
   await sendReply(aiResult.text);
 
@@ -163,7 +183,6 @@ export async function handleIncomingMessage(opts: {
 /**
  * Called when the business owner sends a message from their WhatsApp (fromMe).
  * Sets the conversation's aiState to OWNER_TAKEN_OVER so the AI stays silent.
- * If no conversation exists yet (owner initiating), nothing is changed.
  */
 export async function handleOwnerMessage(opts: {
   business: Business;

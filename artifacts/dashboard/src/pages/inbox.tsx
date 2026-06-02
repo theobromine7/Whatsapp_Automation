@@ -17,6 +17,9 @@ import {
   ShieldOff,
   ChevronDown,
   Send,
+  Sparkles,
+  Ban,
+  User,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -33,13 +36,15 @@ import { cn } from "@/lib/utils";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
+type AiState = "NEW_LEAD" | "AI_ACTIVE" | "OWNER_TAKEN_OVER" | "PERSONAL_CONTACT" | "BLOCKED";
+
 interface ConversationListItem {
   id: number;
   businessId: number;
   businessName: string | null;
   customerPhone: string;
   customerName: string | null;
-  aiState: string;
+  aiState: AiState;
   contactType: string | null;
   contactTag: string | null;
   ownerLastMessageAt: string | null;
@@ -48,6 +53,70 @@ interface ConversationListItem {
   messageCount: number;
   lastMessage: string | null;
   lastMessageAt: string | null;
+}
+
+// ─── AI State Config ──────────────────────────────────────────────────────────
+
+interface AiStateConfig {
+  label: string;
+  badgeClass: string;
+  icon: React.ElementType;
+  stripText: string;
+  stripClass: string;
+  stripIcon: React.ElementType;
+  showResumeBtn: boolean;
+}
+
+const AI_STATE_CONFIG: Record<AiState, AiStateConfig> = {
+  NEW_LEAD: {
+    label: "New Lead",
+    badgeClass: "border-violet-300 text-violet-700 bg-violet-50",
+    icon: Sparkles,
+    stripText: "New lead — AI agent will reply automatically",
+    stripClass: "text-violet-700",
+    stripIcon: Sparkles,
+    showResumeBtn: false,
+  },
+  AI_ACTIVE: {
+    label: "AI Active",
+    badgeClass: "border-primary/30 text-primary bg-primary/5",
+    icon: Bot,
+    stripText: "AI agent is handling replies automatically",
+    stripClass: "text-[#8696a0]",
+    stripIcon: Bot,
+    showResumeBtn: false,
+  },
+  OWNER_TAKEN_OVER: {
+    label: "Human Active",
+    badgeClass: "border-orange-400/60 text-orange-600 bg-orange-50",
+    icon: UserCheck,
+    stripText: "You're handling this chat · AI resumes in 30 min",
+    stripClass: "text-orange-700",
+    stripIcon: UserCheck,
+    showResumeBtn: true,
+  },
+  PERSONAL_CONTACT: {
+    label: "Personal",
+    badgeClass: "border-pink-300 text-pink-700 bg-pink-50",
+    icon: User,
+    stripText: "Personal contact — auto-reply is off",
+    stripClass: "text-pink-700",
+    stripIcon: User,
+    showResumeBtn: false,
+  },
+  BLOCKED: {
+    label: "Blocked",
+    badgeClass: "border-red-300 text-red-600 bg-red-50",
+    icon: Ban,
+    stripText: "Blocked — AI will never reply to this contact",
+    stripClass: "text-red-600",
+    stripIcon: Ban,
+    showResumeBtn: false,
+  },
+};
+
+function getStateConfig(aiState: string): AiStateConfig {
+  return AI_STATE_CONFIG[aiState as AiState] ?? AI_STATE_CONFIG.AI_ACTIVE;
 }
 
 // ─── Contact Tag Config ───────────────────────────────────────────────────────
@@ -74,18 +143,9 @@ const TYPE_STYLES: Record<string, string> = {
   UNKNOWN:          "border-gray-200 text-gray-500 bg-gray-50",
 };
 
-const BLOCKED_TAGS = new Set(["PERSONAL", "FAMILY", "STAFF", "SUPPLIER"]);
-const BLOCKED_TYPES = new Set(["PERSONAL_CONTACT", "FAMILY", "STAFF", "SUPPLIER"]);
-
-function isAutoReplyBlocked(conv: ConversationListItem): boolean {
-  if (conv.contactTag && BLOCKED_TAGS.has(conv.contactTag)) return true;
-  if (!conv.contactTag && conv.contactType && BLOCKED_TYPES.has(conv.contactType)) return true;
-  return false;
-}
-
 function displayLabel(conv: ConversationListItem): string | null {
   if (conv.contactTag) return conv.contactTag.charAt(0) + conv.contactTag.slice(1).toLowerCase();
-  if (conv.contactType) return conv.contactType.replace("_", " ").charAt(0) + conv.contactType.replace("_", " ").slice(1).toLowerCase();
+  if (conv.contactType) return conv.contactType.replace(/_/g, " ").charAt(0) + conv.contactType.replace(/_/g, " ").slice(1).toLowerCase();
   return null;
 }
 
@@ -129,6 +189,7 @@ function ContactTagSelector({
   conv: ConversationListItem;
   onTagChange: (tag: string | null) => void;
 }) {
+  const BLOCKED_TAGS = new Set(["PERSONAL", "FAMILY", "STAFF", "SUPPLIER"]);
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
@@ -179,22 +240,71 @@ function ContactTagSelector({
   );
 }
 
+// ─── AI State Selector ────────────────────────────────────────────────────────
+
+function AiStateSelector({
+  conv,
+  onStateChange,
+}: {
+  conv: ConversationListItem;
+  onStateChange: (state: AiState) => void;
+}) {
+  const cfg = getStateConfig(conv.aiState);
+  const Icon = cfg.icon;
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Badge
+          variant="outline"
+          className={cn("text-[10px] gap-1 cursor-pointer hover:opacity-80 shrink-0", cfg.badgeClass)}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <Icon className="w-2.5 h-2.5" />
+          {cfg.label}
+          <ChevronDown className="w-2.5 h-2.5 opacity-60" />
+        </Badge>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
+        <DropdownMenuLabel className="text-xs text-muted-foreground">Set automation state</DropdownMenuLabel>
+        <DropdownMenuSeparator />
+        {(["NEW_LEAD", "AI_ACTIVE", "OWNER_TAKEN_OVER", "PERSONAL_CONTACT", "BLOCKED"] as AiState[]).map((state) => {
+          const s = AI_STATE_CONFIG[state];
+          const SIcon = s.icon;
+          return (
+            <DropdownMenuItem
+              key={state}
+              className={cn("text-xs gap-2", conv.aiState === state && "font-semibold")}
+              onClick={() => onStateChange(state)}
+            >
+              <SIcon className="w-3 h-3 opacity-70" />
+              {s.label}
+              {conv.aiState === state && <span className="text-[10px] text-muted-foreground ml-auto">current</span>}
+            </DropdownMenuItem>
+          );
+        })}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
+
 // ─── Chat view ────────────────────────────────────────────────────────────────
 
 function ChatView({
   conv,
   onTagChange,
+  onStateChange,
 }: {
   conv: ConversationListItem;
   onTagChange: (tag: string | null) => void;
+  onStateChange: (state: AiState) => void;
 }) {
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const queryClient = useQueryClient();
   const [inputText, setInputText] = useState("");
 
-  const isTakenOver = conv.aiState === "OWNER_TAKEN_OVER";
-  const blocked = isAutoReplyBlocked(conv);
+  const cfg = getStateConfig(conv.aiState);
+  const StripIcon = cfg.stripIcon;
   const label = displayLabel(conv);
 
   const { data: messages, isLoading } = useListConversationMessages(conv.id, {
@@ -271,23 +381,8 @@ function ChatView({
         {/* Tag selector */}
         <ContactTagSelector conv={conv} onTagChange={onTagChange} />
 
-        {/* AI/human state badge */}
-        {blocked ? (
-          <Badge variant="outline" className="text-[10px] border-gray-300 text-gray-500 bg-gray-50 gap-1 shrink-0">
-            <ShieldOff className="w-2.5 h-2.5" />
-            No Auto-Reply
-          </Badge>
-        ) : isTakenOver ? (
-          <Badge variant="outline" className="text-[10px] border-orange-400/60 text-orange-600 bg-orange-50 gap-1 shrink-0">
-            <UserCheck className="w-2.5 h-2.5" />
-            Human Active
-          </Badge>
-        ) : (
-          <Badge variant="outline" className="text-[10px] border-primary/30 text-primary bg-primary/5 gap-1 shrink-0">
-            <Bot className="w-2.5 h-2.5" />
-            AI Active
-          </Badge>
-        )}
+        {/* AI state selector — click to change state */}
+        <AiStateSelector conv={conv} onStateChange={onStateChange} />
       </div>
 
       {/* Messages area */}
@@ -361,24 +456,12 @@ function ChatView({
       <div className="bg-[#f0f2f5] border-t border-[#e9edef] shrink-0">
         {/* Status strip */}
         <div className="px-4 pt-2 pb-1 flex items-center justify-between gap-3">
-          {blocked ? (
-            <div className="flex items-center gap-2 text-xs text-gray-500">
-              <ShieldOff className="w-3.5 h-3.5 text-gray-400 shrink-0" />
-              Auto-reply off — tagged as <span className="font-medium">{conv.contactTag ?? conv.contactType?.replace("_", " ").toLowerCase()}</span>
-            </div>
-          ) : isTakenOver ? (
-            <div className="flex items-center gap-2 text-xs text-orange-700">
-              <UserCheck className="w-3.5 h-3.5 text-orange-500 shrink-0" />
-              <span>You're handling this chat · AI resumes in 30 min</span>
-            </div>
-          ) : (
-            <div className="flex items-center gap-2 text-xs text-[#8696a0]">
-              <Bot className="w-3.5 h-3.5 text-primary/60 shrink-0" />
-              <span>AI agent is handling replies automatically</span>
-            </div>
-          )}
+          <div className={cn("flex items-center gap-2 text-xs", cfg.stripClass)}>
+            <StripIcon className="w-3.5 h-3.5 shrink-0" />
+            <span>{cfg.stripText}</span>
+          </div>
 
-          {isTakenOver && (
+          {cfg.showResumeBtn && (
             <Button
               size="sm"
               variant="outline"
@@ -433,7 +516,8 @@ function ConvItem({
   isActive: boolean;
   onClick: () => void;
 }) {
-  const blocked = isAutoReplyBlocked(conv);
+  const cfg = getStateConfig(conv.aiState);
+  const StateIcon = cfg.icon;
   const label = displayLabel(conv);
 
   return (
@@ -453,15 +537,15 @@ function ConvItem({
             {conv.customerName || conv.customerPhone}
           </span>
           <div className="flex items-center gap-1.5 shrink-0 ml-2">
-            {blocked ? (
-              <span title="Auto-reply disabled for this contact">
-                <ShieldOff className="w-3 h-3 text-gray-400" />
-              </span>
-            ) : conv.aiState === "OWNER_TAKEN_OVER" ? (
-              <span title="Human active — AI paused">
-                <UserCheck className="w-3 h-3 text-orange-500" />
-              </span>
-            ) : null}
+            <span title={cfg.label}>
+              <StateIcon className={cn("w-3 h-3", {
+                "text-violet-500": conv.aiState === "NEW_LEAD",
+                "text-primary": conv.aiState === "AI_ACTIVE",
+                "text-orange-500": conv.aiState === "OWNER_TAKEN_OVER",
+                "text-pink-500": conv.aiState === "PERSONAL_CONTACT",
+                "text-red-500": conv.aiState === "BLOCKED",
+              })} />
+            </span>
             <span className="text-[11px] text-[#667781]">
               {formatConvTime(conv.lastMessageAt || conv.updatedAt)}
             </span>
@@ -508,6 +592,17 @@ export default function Inbox() {
       customFetch(`/conversations/${id}/contact-tag`, {
         method: "PATCH",
         body: JSON.stringify({ contactTag }),
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["conversations-all"] });
+    },
+  });
+
+  const setStateMutation = useMutation({
+    mutationFn: ({ id, aiState }: { id: number; aiState: AiState }) =>
+      customFetch(`/conversations/${id}/ai-state`, {
+        method: "PATCH",
+        body: JSON.stringify({ aiState }),
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["conversations-all"] });
@@ -594,31 +689,36 @@ export default function Inbox() {
         </div>
       </div>
 
-      {/* Chat / Empty state */}
-      <div className="flex-1 min-w-0 flex flex-col min-h-0">
+      {/* Chat panel */}
+      <div className="flex-1 min-w-0 min-h-0 flex flex-col">
         {selected ? (
           <ChatView
+            key={selected.id}
             conv={selected}
             onTagChange={(tag) => setTagMutation.mutate({ id: selected.id, contactTag: tag })}
+            onStateChange={(state) => setStateMutation.mutate({ id: selected.id, aiState: state })}
           />
         ) : (
-          <div className="flex-1 flex flex-col items-center justify-center bg-[#f0f2f5] gap-4">
-            <div className="w-20 h-20 rounded-full bg-[#d9d9d9] flex items-center justify-center">
-              <MessageSquare className="w-9 h-9 text-white" />
+          <div className="flex-1 flex flex-col items-center justify-center gap-4 text-center bg-[#f0f2f5]">
+            <div className="w-20 h-20 rounded-full bg-white/80 flex items-center justify-center shadow-sm">
+              <MessageSquare className="w-9 h-9 text-[#c4c4c4]" />
             </div>
-            <div className="text-center">
-              <h2 className="text-2xl font-light text-[#41525d] mb-2">NexusAgent</h2>
-              <p className="text-sm text-[#667781] max-w-xs">
-                Select a conversation from the left to view the chat thread.
-                Your AI agent handles responses automatically.
-              </p>
+            <div>
+              <p className="font-semibold text-[#111b21] text-base">Select a conversation</p>
+              <p className="text-sm text-[#667781] mt-1">Choose a chat from the list to view messages</p>
             </div>
-            {conversations && conversations.length === 0 && (
-              <div className="flex items-center gap-2 bg-white rounded-xl px-4 py-3 shadow-sm text-sm text-[#54656f]">
-                <Building2 className="w-4 h-4 text-primary" />
-                Connect a WhatsApp number to start
-              </div>
-            )}
+            <div className="flex flex-wrap justify-center gap-2 mt-2 max-w-xs">
+              {(["NEW_LEAD", "AI_ACTIVE", "OWNER_TAKEN_OVER", "PERSONAL_CONTACT", "BLOCKED"] as AiState[]).map((state) => {
+                const s = AI_STATE_CONFIG[state];
+                const SIcon = s.icon;
+                return (
+                  <Badge key={state} variant="outline" className={cn("text-[10px] gap-1", s.badgeClass)}>
+                    <SIcon className="w-2.5 h-2.5" />
+                    {s.label}
+                  </Badge>
+                );
+              })}
+            </div>
           </div>
         )}
       </div>

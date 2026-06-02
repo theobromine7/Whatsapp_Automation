@@ -73,6 +73,7 @@ export interface WhatsappConversation {
   customerPhone: string;
   /** @nullable */
   customerName?: string | null;
+  /** Automation state: NEW_LEAD | AI_ACTIVE | OWNER_TAKEN_OVER | PERSONAL_CONTACT | BLOCKED */
   aiState?: string;
   /**
      * AI-classified contact type: SALES_LEAD | CUSTOMER | PERSONAL_CONTACT | FAMILY | STAFF | SUPPLIER | UNKNOWN

@@ -1,6 +1,6 @@
 import { ai } from "@workspace/integrations-gemini-ai";
 import { logger } from "./logger";
-import type { ContactType } from "@workspace/db";
+import type { ContactType, AiState } from "@workspace/db";
 
 const VALID_TYPES: ContactType[] = [
   "SALES_LEAD",
@@ -13,11 +13,9 @@ const VALID_TYPES: ContactType[] = [
 ];
 
 /**
- * Classify an incoming message to determine if the AI should auto-reply.
+ * Classify an incoming message to determine contact type.
  *
  * Returns one of: SALES_LEAD, CUSTOMER, PERSONAL_CONTACT, FAMILY, STAFF, SUPPLIER, UNKNOWN
- *
- * Only SALES_LEAD and CUSTOMER should receive AI auto-replies.
  */
 export async function classifyContact(messageText: string, customerName: string | null): Promise<ContactType> {
   const nameHint = customerName ? ` The sender's name is "${customerName}".` : "";
@@ -61,27 +59,56 @@ Category:`;
 }
 
 /**
- * Determine whether the AI should auto-reply based on contactType and contactTag.
- * contactTag (owner-set) takes precedence over contactType (AI-classified).
+ * Derive the initial aiState from a freshly classified contactType.
+ *
+ * Personal / non-business contacts → PERSONAL_CONTACT (AI never replies)
+ * Sales leads / customers          → NEW_LEAD (AI will engage)
+ * Unknown                          → NEW_LEAD (benefit of the doubt)
  */
-export function shouldAutoReply(
-  contactType: ContactType | null | undefined,
-  contactTag: string | null | undefined
-): boolean {
-  // Owner-set tag takes highest precedence
-  if (contactTag) {
-    const blocked = ["PERSONAL", "FAMILY", "STAFF", "SUPPLIER"];
-    if (blocked.includes(contactTag)) return false;
-    // CUSTOMER and LEAD tags explicitly allow replies
-    if (contactTag === "CUSTOMER" || contactTag === "LEAD") return true;
-  }
+export function initialAiStateFromContactType(contactType: ContactType): AiState {
+  const nonBusiness: ContactType[] = ["PERSONAL_CONTACT", "FAMILY", "STAFF", "SUPPLIER"];
+  return nonBusiness.includes(contactType) ? "PERSONAL_CONTACT" : "NEW_LEAD";
+}
 
-  // AI-classified type
-  if (contactType) {
-    const allowed: ContactType[] = ["SALES_LEAD", "CUSTOMER"];
-    return allowed.includes(contactType);
-  }
+/**
+ * Determine whether the AI should auto-reply based on the conversation aiState.
+ * BLOCKED and PERSONAL_CONTACT are permanent silences.
+ * OWNER_TAKEN_OVER is a temporary silence.
+ * NEW_LEAD and AI_ACTIVE allow replies (subject to intent filter).
+ */
+export function shouldAutoReply(aiState: string): boolean {
+  return aiState === "NEW_LEAD" || aiState === "AI_ACTIVE";
+}
 
-  // If neither is set yet (first classification hasn't run), allow by default
-  return true;
+/**
+ * Low-value message filter (Feature 6).
+ *
+ * Returns true when the message is a short social acknowledgement with no
+ * business intent — these should NOT trigger an AI reply.
+ *
+ * Examples: "ok", "thanks", "👍", "done", "noted", "sure", "k"
+ */
+export function isLowValueMessage(text: string): boolean {
+  const normalised = text.trim().toLowerCase();
+
+  // Single emoji reactions or punctuation only
+  if (/^[\p{Emoji}\s!.?,]*$/u.test(normalised) && normalised.length <= 8) return true;
+
+  // Common low-value phrases (full match, allowing trailing punctuation)
+  const LOW_VALUE_PHRASES = [
+    "ok", "okay", "k", "kk",
+    "thanks", "thank you", "thx", "thnx", "ty",
+    "done", "noted", "noted thanks", "noted thank you",
+    "alright", "alright thanks",
+    "got it", "got it thanks",
+    "sure", "sure thanks",
+    "hmm", "hm", "uh",
+    "great", "nice", "cool", "good", "wow",
+    "bye", "goodbye", "cya",
+    "hello", "hi", "hey", "hii", "hiii",
+    "yes", "no", "yep", "nope", "nah", "yeah",
+  ];
+
+  const stripped = normalised.replace(/[!.,?]+$/, "").trim();
+  return LOW_VALUE_PHRASES.includes(stripped);
 }

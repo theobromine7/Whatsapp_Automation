@@ -1,7 +1,7 @@
 import { Router, type IRouter } from "express";
 import { eq, count, sql, and } from "drizzle-orm";
 import { db, whatsappConversationsTable, whatsappMessagesTable, businessesTable } from "@workspace/db";
-import { CONTACT_TAGS } from "@workspace/db";
+import { CONTACT_TAGS, AI_STATES } from "@workspace/db";
 import {
   ListBusinessConversationsParams,
   ListBusinessConversationsResponse,
@@ -42,7 +42,8 @@ router.get("/conversations/all", requireAuth, async (req, res): Promise<void> =>
   res.json(rows.rows);
 });
 
-// Manually set the AI state of a conversation (e.g. resume AI after human takeover)
+// Set the AI state of a conversation
+// Accepts all 5 states: NEW_LEAD, AI_ACTIVE, OWNER_TAKEN_OVER, PERSONAL_CONTACT, BLOCKED
 router.patch("/conversations/:id/ai-state", requireAuth, async (req, res): Promise<void> => {
   const id = parseInt(String(req.params["id"] ?? ""), 10);
   if (isNaN(id)) {
@@ -51,8 +52,8 @@ router.patch("/conversations/:id/ai-state", requireAuth, async (req, res): Promi
   }
 
   const { aiState } = req.body as { aiState?: string };
-  if (aiState !== "AI_ACTIVE" && aiState !== "OWNER_TAKEN_OVER") {
-    res.status(400).json({ error: "aiState must be AI_ACTIVE or OWNER_TAKEN_OVER" });
+  if (!aiState || !(AI_STATES as readonly string[]).includes(aiState)) {
+    res.status(400).json({ error: `aiState must be one of: ${AI_STATES.join(", ")}` });
     return;
   }
 
@@ -78,7 +79,7 @@ router.patch("/conversations/:id/ai-state", requireAuth, async (req, res): Promi
 
   await db
     .update(whatsappConversationsTable)
-    .set({ aiState })
+    .set({ aiState: aiState as any })
     .where(eq(whatsappConversationsTable.id, id));
 
   res.json({ id, aiState });

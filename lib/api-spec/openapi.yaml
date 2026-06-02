@@ -685,6 +685,7 @@ components:
           type: ["string", "null"]
         aiState:
           type: string
+          description: "Automation state: NEW_LEAD | AI_ACTIVE | OWNER_TAKEN_OVER | PERSONAL_CONTACT | BLOCKED"
         contactType:
           type: ["string", "null"]
           description: "AI-classified contact type: SALES_LEAD | CUSTOMER | PERSONAL_CONTACT | FAMILY | STAFF | SUPPLIER | UNKNOWN"

@@ -113,7 +113,7 @@ RESPONSE FORMAT — You MUST respond ONLY with valid JSON matching this schema e
 {
   "intent": "<one-sentence description of what the customer is asking>",
   "confidence": <number 0.0–1.0>,
-  "reply": "<your actual response, plain text only, no markdown>"
+  "reply": "<your actual response — plain text only, no markdown, MAXIMUM 20 WORDS>"
 }
 
 Confidence scoring guide:
@@ -139,7 +139,7 @@ Confidence scoring guide:
       contents: buildContents(msgs),
       config: {
         systemInstruction,
-        maxOutputTokens: 2048,
+        maxOutputTokens: 300,
         responseMimeType: "application/json",
       },
     });
@@ -328,19 +328,25 @@ function buildSystemPrompt(business: Business, withinBusinessHours: boolean): st
     ? `\n\nBUSINESS HOURS: The business is currently OUTSIDE operating hours. Politely acknowledge this, capture the customer's inquiry details, and assure them that the team will follow up during business hours. Still answer product questions you have data for.`
     : "";
 
-  let prompt = `You are an AI sales assistant for ${business.name}, a ${business.businessType}.
+  const hasProductContext = !!(business.products || business.faqs);
 
-${business.description}
+  const noContextWarning = !hasProductContext
+    ? `\n\nIMPORTANT — NO CATALOG DATA: You have no product catalog, pricing, or store information available yet. Do NOT invent, assume, or guess any product names, prices, availability, or URLs. If asked about products or prices, say something like "Let me get those details for you — what are you looking for?" and keep it short.`
+    : "";
 
-${business.systemPrompt}
+  let prompt = `You are an AI sales assistant for ${business.name}, a ${business.businessType ?? "business"}.
+
+${business.description ?? ""}
+
+${business.systemPrompt ?? ""}
 
 CORE RULES — follow these strictly:
 - You are a SALES ASSISTANT, not a general chatbot. Stay focused on sales, products, pricing, availability, orders, and delivery.
-- Be friendly, concise, and conversational (WhatsApp style — short paragraphs, no bullet formatting, plain text only).
-- NEVER invent, guess, or estimate any price, stock level, or product URL. If you don't have data for it, say so clearly.
-- ONLY share product links or URLs that appear verbatim in the PRODUCT KNOWLEDGE BASE. Do not guess or construct URLs.
-- If asked about something completely outside your sales scope, politely redirect to what you can help with.
-- Always move the conversation toward a purchase decision or lead capture.${hoursNote}${
+- REPLY LENGTH: Keep every reply under 20 words. Be direct, specific, and conversational (WhatsApp style). No bullet points, no markdown, plain text only.
+- NEVER invent, guess, or estimate any price, stock level, or product URL. If you don't have data for it, say so clearly and ask for more details.
+- ONLY share product links or URLs that appear verbatim in the PRODUCT KNOWLEDGE BASE. Do not construct or guess URLs.
+- If asked about something outside your sales scope, politely redirect to what you can help with.
+- Always move the conversation toward a purchase decision or lead capture.${noContextWarning}${hoursNote}${
   business.storeSlug
     ? `\n- When a customer asks to browse all products, share: https://store.advize.in/store/${business.storeSlug}`
     : ""

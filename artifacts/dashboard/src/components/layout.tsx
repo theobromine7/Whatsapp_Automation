@@ -6,6 +6,7 @@ import {
   PlusCircle,
   LogOut,
   Settings,
+  Crown,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
@@ -18,6 +19,7 @@ const NAV = [
   { href: "/dashboard", icon: LayoutDashboard, label: "Dashboard" },
   { href: "/businesses", icon: Building2, label: "Businesses" },
   { href: "/businesses/new", icon: PlusCircle, label: "Add" },
+  { href: "/pricing", icon: Crown, label: "Pricing" },
   { href: "/settings", icon: Settings, label: "Settings" },
 ];
 

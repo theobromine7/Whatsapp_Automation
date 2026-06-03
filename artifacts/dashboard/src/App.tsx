@@ -17,6 +17,8 @@ import ConversationDetail from "@/pages/conversations/detail";
 import Settings from "@/pages/settings";
 import Terms from "@/pages/terms";
 import Privacy from "@/pages/privacy";
+import Pricing from "@/pages/pricing";
+import Checkout from "@/pages/checkout";
 import NotFound from "@/pages/not-found";
 
 const queryClient = new QueryClient();
@@ -74,6 +76,8 @@ function Router() {
               <Route path="/businesses/:id">
                 {() => <PageLayout><BusinessDetail /></PageLayout>}
               </Route>
+              <Route path="/pricing" component={Pricing} />
+              <Route path="/checkout/:plan" component={Checkout} />
               <Route path="/settings">
                 <PageLayout><Settings /></PageLayout>
               </Route>

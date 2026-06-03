@@ -1,5 +1,6 @@
 import { Router, type IRouter } from "express";
 import { eq, and } from "drizzle-orm";
+import { randomBytes } from "crypto";
 import { db, businessesTable } from "@workspace/db";
 import {
   ListBusinessesResponse,
@@ -183,10 +184,17 @@ router.post("/businesses/:id/connect-meta", requireAuth, async (req, res): Promi
       return;
     }
 
+    // Preserve the existing token or generate a stable one server-side
+    const webhookVerifyToken =
+      existing.webhookVerifyToken || randomBytes(12).toString("hex");
+
     const [business] = await db
       .update(businessesTable)
       .set({
-        ...parsed.data,
+        whatsappPhoneNumber: parsed.data.whatsappPhoneNumber,
+        whatsappPhoneNumberId: parsed.data.whatsappPhoneNumberId,
+        whatsappAccessToken: parsed.data.whatsappAccessToken,
+        webhookVerifyToken,
         connectionType: "meta_cloud",
         sessionStatus: null,
         connectedPhone: null,

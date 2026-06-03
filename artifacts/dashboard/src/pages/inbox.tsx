@@ -24,6 +24,7 @@ import {
   CheckCheck,
   Paperclip,
   ImageIcon,
+  ArrowLeft,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -299,10 +300,12 @@ function ChatView({
   conv,
   onTagChange,
   onStateChange,
+  onBack,
 }: {
   conv: ConversationListItem;
   onTagChange: (tag: string | null) => void;
   onStateChange: (state: AiState) => void;
+  onBack?: () => void;
 }) {
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -405,7 +408,15 @@ function ChatView({
   return (
     <div className="flex flex-col h-full relative">
       {/* Chat header */}
-      <div className="h-[60px] bg-[#f0f2f5] border-b border-[#e9edef] px-5 flex items-center gap-3 shrink-0">
+      <div className="h-[60px] bg-[#f0f2f5] border-b border-[#e9edef] px-3 md:px-5 flex items-center gap-2 md:gap-3 shrink-0">
+        {onBack && (
+          <button
+            onClick={onBack}
+            className="md:hidden w-8 h-8 flex items-center justify-center rounded-full text-[#54656f] hover:bg-black/5 shrink-0"
+          >
+            <ArrowLeft className="w-5 h-5" />
+          </button>
+        )}
         <div className={cn("w-10 h-10 rounded-full flex items-center justify-center text-white font-semibold text-sm shrink-0", avatarColor(conv.id))}>
           {getInitials(conv.customerName, conv.customerPhone)}
         </div>
@@ -784,8 +795,12 @@ export default function Inbox() {
 
   return (
     <div className="flex h-full min-h-0">
-      {/* Conversation list panel */}
-      <div className="w-[340px] shrink-0 flex flex-col border-r border-[#e9edef] bg-white min-h-0">
+      {/* Conversation list panel — full-width on mobile when no chat open */}
+      <div className={cn(
+        "flex flex-col border-r border-[#e9edef] bg-white min-h-0",
+        "w-full md:w-[340px] md:shrink-0",
+        selectedId ? "hidden md:flex" : "flex"
+      )}>
         {/* Header */}
         <div className="h-[60px] bg-[#f0f2f5] border-b border-[#e9edef] px-4 flex items-center justify-between shrink-0">
           <h1 className="font-semibold text-[#111b21] text-base">Inbox</h1>
@@ -878,12 +893,16 @@ export default function Inbox() {
         </div>
       </div>
 
-      {/* Chat panel */}
-      <div className="flex-1 min-w-0 min-h-0 flex flex-col">
+      {/* Chat panel — full-width on mobile when a chat is open */}
+      <div className={cn(
+        "flex-1 min-w-0 min-h-0 flex flex-col",
+        selectedId ? "flex" : "hidden md:flex"
+      )}>
         {selected ? (
           <ChatView
             key={selected.id}
             conv={selected}
+            onBack={() => setSelectedId(null)}
             onTagChange={(tag) => setTagMutation.mutate({ id: selected.id, contactTag: tag })}
             onStateChange={(state) => setStateMutation.mutate({ id: selected.id, aiState: state })}
           />

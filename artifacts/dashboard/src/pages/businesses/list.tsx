@@ -31,7 +31,7 @@ export default function BusinessList() {
   return (
     <div className="flex-1 overflow-y-auto">
       {/* Header bar */}
-      <div className="h-[60px] bg-[#f0f2f5] border-b border-[#e9edef] px-6 flex items-center justify-between shrink-0">
+      <div className="h-[60px] bg-[#f0f2f5] border-b border-[#e9edef] px-4 md:px-6 flex items-center justify-between shrink-0">
         <h1 className="font-semibold text-[#111b21] text-base">Businesses</h1>
         <Link href="/businesses/new">
           <Button size="sm" className="h-8 gap-1.5 text-xs">
@@ -40,7 +40,7 @@ export default function BusinessList() {
         </Link>
       </div>
 
-      <div className="p-6 max-w-3xl mx-auto space-y-3">
+      <div className="p-4 md:p-6 max-w-3xl mx-auto space-y-3">
         {isLoading ? (
           Array(3).fill(0).map((_, i) => (
             <Skeleton key={i} className="h-20 w-full rounded-xl" />

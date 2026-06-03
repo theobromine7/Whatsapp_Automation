@@ -4,7 +4,6 @@ import {
   LayoutDashboard,
   Building2,
   PlusCircle,
-  Zap,
   LogOut,
   Settings,
 } from "lucide-react";
@@ -18,7 +17,7 @@ const NAV = [
   { href: "/inbox", icon: MessageSquare, label: "Inbox" },
   { href: "/dashboard", icon: LayoutDashboard, label: "Dashboard" },
   { href: "/businesses", icon: Building2, label: "Businesses" },
-  { href: "/businesses/new", icon: PlusCircle, label: "Add Business" },
+  { href: "/businesses/new", icon: PlusCircle, label: "Add" },
   { href: "/settings", icon: Settings, label: "Settings" },
 ];
 
@@ -49,8 +48,8 @@ export function Layout({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="flex h-screen w-full overflow-hidden bg-background">
-      {/* Dark icon sidebar */}
-      <aside className="w-[68px] shrink-0 bg-[#1f2c34] flex flex-col items-center py-3 gap-1 z-20">
+      {/* Desktop icon sidebar — hidden on mobile */}
+      <aside className="hidden md:flex w-[68px] shrink-0 bg-[#1f2c34] flex-col items-center py-3 gap-1 z-20">
         {/* Logo */}
         <div className="w-12 h-12 mb-4 shrink-0">
           <img src="/logo.png" alt="Wapp" className="w-full h-full object-contain" />
@@ -114,9 +113,26 @@ export function Layout({ children }: { children: React.ReactNode }) {
       </aside>
 
       {/* Main content area */}
-      <div className="flex-1 min-w-0 flex flex-col overflow-hidden">
+      <div className="flex-1 min-w-0 flex flex-col overflow-hidden pb-[60px] md:pb-0">
         {children}
       </div>
+
+      {/* Mobile bottom nav bar */}
+      <nav className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-[#1f2c34] flex items-center justify-around px-1 pt-2 pb-[max(8px,env(safe-area-inset-bottom))]">
+        {NAV.map(({ href, icon: Icon, label }) => (
+          <Link key={href} href={href}>
+            <div className={cn(
+              "flex flex-col items-center gap-0.5 px-3 py-1 rounded-xl transition-all",
+              isActive(href) ? "text-white" : "text-[#8696a0]"
+            )}>
+              <Icon className={cn("w-5 h-5", isActive(href) && "text-primary")} />
+              <span className={cn("text-[10px] font-medium", isActive(href) ? "text-primary" : "text-[#8696a0]")}>
+                {label}
+              </span>
+            </div>
+          </Link>
+        ))}
+      </nav>
     </div>
   );
 }
@@ -125,7 +141,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
 export function PageLayout({ children }: { children: React.ReactNode }) {
   return (
     <div className="flex-1 overflow-y-auto">
-      <div className="container mx-auto p-6 md:p-8 max-w-5xl">
+      <div className="container mx-auto p-4 md:p-8 max-w-5xl">
         {children}
       </div>
     </div>

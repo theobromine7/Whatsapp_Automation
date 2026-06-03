@@ -513,35 +513,35 @@ export default function BusinessDetail() {
   return (
     <div className="space-y-6 animate-in fade-in duration-500 max-w-5xl mx-auto">
       {/* Header */}
-      <div className="flex items-start justify-between flex-wrap gap-4">
-        <div className="flex items-center gap-4">
+      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
+        <div className="flex items-center gap-3">
           <Link href="/">
-            <Button variant="outline" size="icon" className="shrink-0">
+            <Button variant="outline" size="icon" className="shrink-0 h-8 w-8">
               <ArrowLeft className="w-4 h-4" />
             </Button>
           </Link>
-          <div>
-            <div className="flex items-center gap-3 flex-wrap">
-              <h1 className="text-2xl font-bold tracking-tight">{business.name}</h1>
-              <Badge variant={business.isActive ? "default" : "secondary"}>
+          <div className="min-w-0">
+            <div className="flex items-center gap-2 flex-wrap">
+              <h1 className="text-lg md:text-2xl font-bold tracking-tight truncate">{business.name}</h1>
+              <Badge variant={business.isActive ? "default" : "secondary"} className="shrink-0">
                 {business.isActive ? "Active" : "Paused"}
               </Badge>
               {isConnected ? (
-                <Badge variant="outline" className="border-green-300 text-green-700 bg-green-50 gap-1">
+                <Badge variant="outline" className="border-green-300 text-green-700 bg-green-50 gap-1 shrink-0">
                   <Wifi className="w-3 h-3" /> Connected
                 </Badge>
               ) : (
-                <Badge variant="outline" className="border-orange-300 text-orange-700 bg-orange-50 gap-1">
+                <Badge variant="outline" className="border-orange-300 text-orange-700 bg-orange-50 gap-1 shrink-0">
                   <WifiOff className="w-3 h-3" /> Not Connected
                 </Badge>
               )}
             </div>
-            <p className="text-muted-foreground text-sm mt-0.5">
+            <p className="text-muted-foreground text-sm mt-0.5 truncate">
               {displayPhone ?? business.businessType}
             </p>
           </div>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 shrink-0">
           <Button
             variant={business.isActive ? "destructive" : "default"}
             onClick={handleToggle}
@@ -549,15 +549,15 @@ export default function BusinessDetail() {
             size="sm"
           >
             {business.isActive ? (
-              <><PowerOff className="w-4 h-4 mr-2" /> Pause Bot</>
+              <><PowerOff className="w-4 h-4 mr-1.5" /> Pause</>
             ) : (
-              <><Power className="w-4 h-4 mr-2" /> Activate Bot</>
+              <><Power className="w-4 h-4 mr-1.5" /> Activate</>
             )}
           </Button>
           <AlertDialog>
             <AlertDialogTrigger asChild>
               <Button variant="outline" size="sm" className="border-destructive/50 text-destructive hover:bg-destructive hover:text-destructive-foreground">
-                <Trash2 className="w-4 h-4 mr-2" /> Delete
+                <Trash2 className="w-4 h-4 md:mr-2" /> <span className="hidden md:inline">Delete</span>
               </Button>
             </AlertDialogTrigger>
             <AlertDialogContent>
@@ -605,26 +605,28 @@ export default function BusinessDetail() {
 
       {/* Main tabs */}
       <Tabs defaultValue={isConnected ? "conversations" : "connect"} className="w-full">
-        <TabsList className="grid w-full grid-cols-6 max-w-3xl">
-          <TabsTrigger value="connect" className="gap-1.5">
-            <Link2 className="w-3.5 h-3.5" /> Connect
-          </TabsTrigger>
-          <TabsTrigger value="conversations" className="gap-1.5">
-            <MessageSquare className="w-3.5 h-3.5" /> Chats
-          </TabsTrigger>
-          <TabsTrigger value="store" className="gap-1.5">
-            <Store className="w-3.5 h-3.5" /> Store
-          </TabsTrigger>
-          <TabsTrigger value="knowledge" className="gap-1.5">
-            <BarChart3 className="w-3.5 h-3.5" /> Knowledge
-          </TabsTrigger>
-          <TabsTrigger value="contacts" className="gap-1.5">
-            <Users className="w-3.5 h-3.5" /> Contacts
-          </TabsTrigger>
-          <TabsTrigger value="settings" className="gap-1.5">
-            <Settings2 className="w-3.5 h-3.5" /> Settings
-          </TabsTrigger>
-        </TabsList>
+        <div className="overflow-x-auto -mx-1 px-1 pb-1">
+          <TabsList className="flex w-max md:grid md:w-full md:grid-cols-6 md:max-w-3xl gap-0">
+            <TabsTrigger value="connect" className="gap-1 text-xs md:text-sm px-2 md:px-3">
+              <Link2 className="w-3 h-3 md:w-3.5 md:h-3.5" /> Connect
+            </TabsTrigger>
+            <TabsTrigger value="conversations" className="gap-1 text-xs md:text-sm px-2 md:px-3">
+              <MessageSquare className="w-3 h-3 md:w-3.5 md:h-3.5" /> Chats
+            </TabsTrigger>
+            <TabsTrigger value="store" className="gap-1 text-xs md:text-sm px-2 md:px-3">
+              <Store className="w-3 h-3 md:w-3.5 md:h-3.5" /> Store
+            </TabsTrigger>
+            <TabsTrigger value="knowledge" className="gap-1 text-xs md:text-sm px-2 md:px-3">
+              <BarChart3 className="w-3 h-3 md:w-3.5 md:h-3.5" /> Knowledge
+            </TabsTrigger>
+            <TabsTrigger value="contacts" className="gap-1 text-xs md:text-sm px-2 md:px-3">
+              <Users className="w-3 h-3 md:w-3.5 md:h-3.5" /> Contacts
+            </TabsTrigger>
+            <TabsTrigger value="settings" className="gap-1 text-xs md:text-sm px-2 md:px-3">
+              <Settings2 className="w-3 h-3 md:w-3.5 md:h-3.5" /> Settings
+            </TabsTrigger>
+          </TabsList>
+        </div>
 
         {/* ── Connect Tab ── */}
         <TabsContent value="connect" className="pt-4">

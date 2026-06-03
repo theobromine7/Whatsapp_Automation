@@ -15,6 +15,7 @@ export interface AIResponseResult {
   intent: string;
   confidence: number;
   purchaseIntent: boolean;
+  needsOwner: boolean;
   detectedProductName?: string;
   detectedProductPrice?: number;
 }
@@ -113,6 +114,7 @@ RESPONSE FORMAT — You MUST respond ONLY with valid JSON matching this schema e
 {
   "intent": "<one-sentence description of what the customer is asking>",
   "confidence": <number 0.0–1.0>,
+  "needsOwner": <true or false>,
   "reply": "<your actual response — plain text only, no markdown, MAXIMUM 20 WORDS>"
 }
 
@@ -120,7 +122,16 @@ Confidence scoring guide:
 - 0.90–1.00: Clear product/price/availability/order question; you have specific knowledge to answer accurately
 - 0.70–0.89: Sales inquiry with some ambiguity; you can answer but may be incomplete
 - 0.50–0.69: Unclear intent or only partial knowledge available
-- 0.00–0.49: Cannot determine sales context, or the question requires data you don't have`;
+- 0.00–0.49: Cannot determine sales context, or the question requires data you don't have
+
+needsOwner rules — set to true when ANY of the following apply:
+- Customer explicitly asks to speak to a human, owner, manager, or real person (e.g. "connect me to owner", "talk to someone", "speak to a human", "real person please", "baat karni hai owner se")
+- Customer requests a callback, phone call, or video call
+- Customer has a complaint or issue that requires personal attention
+- Customer asks for a custom deal, negotiation, or bulk order that you cannot confirm
+- Customer expresses frustration or dissatisfaction and needs personal follow-up
+- The request is completely outside your product/service scope and you have no useful answer
+Set needsOwner to false for all normal product, price, availability, or FAQ questions you can answer.`;
 
   const systemInstruction = fullSystemPrompt + paymentPrompt + jsonFormatInstruction;
 
@@ -201,6 +212,7 @@ function parseStructuredResponse(
 ): AIResponseResult {
   let intent = "general inquiry";
   let confidence = 1.0;
+  let needsOwner = false;
   let text = raw;
 
   try {
@@ -209,6 +221,7 @@ function parseStructuredResponse(
     const parsed = JSON.parse(cleaned) as {
       intent?: string;
       confidence?: number;
+      needsOwner?: boolean;
       reply?: string;
     };
 
@@ -216,6 +229,7 @@ function parseStructuredResponse(
     confidence = typeof parsed.confidence === "number"
       ? Math.max(0, Math.min(1, parsed.confidence))
       : 1.0;
+    needsOwner = parsed.needsOwner === true;
 
     if (typeof parsed.reply === "string" && parsed.reply.trim()) {
       text = parsed.reply.trim();
@@ -248,6 +262,7 @@ function parseStructuredResponse(
     intent,
     confidence,
     purchaseIntent,
+    needsOwner,
     detectedProductName: topProduct?.name,
     detectedProductPrice: topProduct?.price,
   };

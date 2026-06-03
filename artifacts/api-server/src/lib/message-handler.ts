@@ -157,7 +157,32 @@ export async function handleIncomingMessage(opts: {
     "AI response generated"
   );
 
-  // ── Confidence Check (Feature 7) ──────────────────────────────────────────
+  // ── Owner Escalation — AI explicitly flagged needsOwner ──────────────────
+  if (aiResult.needsOwner) {
+    logger.info(
+      { businessId: business.id, conversationId: conversation.id, intent: aiResult.intent },
+      "AI flagged needsOwner — escalating to owner review"
+    );
+    await db
+      .update(whatsappConversationsTable)
+      .set({ pendingHumanReview: true, lastDetectedIntent: aiResult.intent, updatedAt: new Date() })
+      .where(eq(whatsappConversationsTable.id, conversation.id));
+
+    // Send acknowledgement so the customer isn't left hanging
+    const ack = aiResult.text && aiResult.text !== "How can I help you?"
+      ? aiResult.text
+      : `Thanks for reaching out! I'll connect you with our team shortly. 🙏`;
+    await db.insert(whatsappMessagesTable).values({
+      conversationId: conversation.id,
+      role: "assistant",
+      content: ack,
+    });
+    try { await sendTyping?.(); await sleep(typingDelay(ack)); await stopTyping?.(); } catch { /* best-effort */ }
+    await sendReply(ack);
+    return;
+  }
+
+  // ── Confidence Check ──────────────────────────────────────────────────────
   // Outside business hours, confidence threshold is relaxed — AI always handles.
   const effectiveThreshold = withinHours ? CONFIDENCE_THRESHOLD : 0.50;
 
@@ -174,6 +199,16 @@ export async function handleIncomingMessage(opts: {
         updatedAt: new Date(),
       })
       .where(eq(whatsappConversationsTable.id, conversation.id));
+
+    // Acknowledge so the customer isn't left on read
+    const ack = `Thanks! Our team will get back to you shortly. 🙏`;
+    await db.insert(whatsappMessagesTable).values({
+      conversationId: conversation.id,
+      role: "assistant",
+      content: ack,
+    });
+    try { await sendTyping?.(); await sleep(typingDelay(ack)); await stopTyping?.(); } catch { /* best-effort */ }
+    await sendReply(ack);
     return;
   }
 

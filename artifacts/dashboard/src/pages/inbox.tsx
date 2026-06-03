@@ -686,7 +686,10 @@ function ConvItem({
           </p>
           <div className="flex items-center gap-1 shrink-0">
             {conv.pendingHumanReview && (
-              <span title="Needs review" className="w-2 h-2 rounded-full bg-amber-400 shrink-0" />
+              <span className="flex items-center gap-0.5 text-[9px] font-semibold bg-amber-100 text-amber-700 border border-amber-300 px-1.5 py-0.5 rounded-full shrink-0 leading-none">
+                <span className="w-1.5 h-1.5 rounded-full bg-amber-500 inline-block" />
+                Review
+              </span>
             )}
             {label && (
               <span className={cn("text-[9px] border px-1 py-0.5 rounded-full leading-none", badgeStyle(conv))}>

@@ -284,7 +284,13 @@ export async function startSession(businessId: number): Promise<void> {
           customerName: pushName,
           messageText: text,
           sendReply: async (replyText) => {
-            await sock.sendMessage(jid, { text: replyText });
+            await (sock as any).sendMessage(jid, { text: replyText });
+          },
+          sendTyping: async () => {
+            await (sock as any).sendPresenceUpdate("composing", jid);
+          },
+          stopTyping: async () => {
+            await (sock as any).sendPresenceUpdate("paused", jid);
           },
         });
       } catch (err) {

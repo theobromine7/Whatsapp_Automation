@@ -361,6 +361,7 @@ CORE RULES — follow these strictly:
 - NEVER invent, guess, or estimate any price, stock level, or URL. Only state what you know for certain from your product data.
 - If a product, category, or item is not available or not in your catalog, tell the customer directly and clearly — e.g. "Sorry, we don't carry that." Then offer the closest alternative if one exists.
 - ONLY share product links or URLs that appear verbatim in the PRODUCT KNOWLEDGE BASE. Do not construct or guess URLs.
+- When a customer asks for multiple product links, or wants to browse all/many products, do NOT list individual links. Instead, send them the store link to browse everything.
 - Always push the conversation toward a purchase or capture what the customer needs.${noContextWarning}${hoursNote}${
   business.storeSlug
     ? `\n- When a customer asks to browse all products, share: https://store.advize.in/store/${business.storeSlug}`

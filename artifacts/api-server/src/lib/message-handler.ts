@@ -9,6 +9,13 @@ import type { Business } from "@workspace/db";
 
 const CONFIDENCE_THRESHOLD = 0.80;
 
+const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
+
+/** Typing delay: ~40ms per character, clamped to 1–3 seconds */
+function typingDelay(text: string): number {
+  return Math.min(3000, Math.max(1000, text.length * 40));
+}
+
 export async function handleIncomingMessage(opts: {
   business: Business;
   customerPhone: string;
@@ -18,8 +25,10 @@ export async function handleIncomingMessage(opts: {
   whatsappMessageId?: string;
   sendReply: (text: string) => Promise<void>;
   sendImage?: (imageBuffer: Buffer, caption?: string) => Promise<void>;
+  sendTyping?: () => Promise<void>;
+  stopTyping?: () => Promise<void>;
 }): Promise<void> {
-  const { business, customerPhone, customerJid, customerName, messageText, whatsappMessageId, sendReply, sendImage } = opts;
+  const { business, customerPhone, customerJid, customerName, messageText, whatsappMessageId, sendReply, sendImage, sendTyping, stopTyping } = opts;
 
   // ── Upsert conversation ───────────────────────────────────────────────────
   let [conversation] = await db
@@ -138,6 +147,7 @@ export async function handleIncomingMessage(opts: {
     logger.error({ err, businessId: business.id }, "AI response generation failed");
     const fallback = `Hi! Thanks for reaching out to ${business.name ?? "us"}. We received your message and will respond shortly! 😊`;
     await db.insert(whatsappMessagesTable).values({ conversationId: conversation.id, role: "assistant", content: fallback });
+    try { await sendTyping?.(); await sleep(1200); await stopTyping?.(); } catch { /* best-effort */ }
     await sendReply(fallback);
     return;
   }
@@ -185,6 +195,15 @@ export async function handleIncomingMessage(opts: {
       updatedAt: new Date(),
     })
     .where(eq(whatsappConversationsTable.id, conversation.id));
+
+  // Show typing indicator then delay before sending
+  try {
+    await sendTyping?.();
+    await sleep(typingDelay(aiResult.text));
+    await stopTyping?.();
+  } catch {
+    // typing indicator is best-effort — never block the reply
+  }
 
   await sendReply(aiResult.text);
 

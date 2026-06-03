@@ -243,7 +243,19 @@ function QRConnectionPanel({ businessId, onConnected }: { businessId: number; on
 
 // ─── Meta Cloud API Panel ─────────────────────────────────────────────────────
 
-function MetaConnectionPanel({ business, onSaved }: { business: { id: number; whatsappPhoneNumber?: string | null; whatsappPhoneNumberId?: string | null; whatsappAccessToken?: string | null; webhookVerifyToken?: string | null; connectionType: string }; onSaved: () => void }) {
+function MetaConnectionPanel({ business, onSaved }: {
+  business: {
+    id: number;
+    whatsappPhoneNumber?: string | null;
+    whatsappPhoneNumberId?: string | null;
+    whatsappAccessToken?: string | null;
+    webhookVerifyToken?: string | null;
+    connectionType: string;
+  };
+  onSaved: () => void;
+}) {
+  const isConnected = business.connectionType === "meta_cloud" && !!business.whatsappPhoneNumberId;
+  const [editing, setEditing] = useState(!isConnected);
   const [formData, setFormData] = useState({
     whatsappPhoneNumber: business.whatsappPhoneNumber ?? "",
     whatsappPhoneNumberId: business.whatsappPhoneNumberId ?? "",
@@ -251,14 +263,55 @@ function MetaConnectionPanel({ business, onSaved }: { business: { id: number; wh
     webhookVerifyToken: business.webhookVerifyToken ?? crypto.randomUUID().replace(/-/g, "").substring(0, 20),
   });
   const [saving, setSaving] = useState(false);
+  const [testing, setTesting] = useState(false);
   const { toast } = useToast();
+
+  const webhookUrl = `${window.location.origin}/api/whatsapp/webhook`;
 
   const copyToClipboard = (text: string, label: string) => {
     navigator.clipboard.writeText(text);
     toast({ title: "Copied", description: `${label} copied to clipboard.` });
   };
 
+  const testCredentials = async () => {
+    if (!formData.whatsappPhoneNumberId || !formData.whatsappAccessToken) {
+      toast({ title: "Missing fields", description: "Enter Phone Number ID and Access Token first.", variant: "destructive" });
+      return;
+    }
+    setTesting(true);
+    try {
+      const res = await fetch(
+        `https://graph.facebook.com/v19.0/${formData.whatsappPhoneNumberId}`,
+        { headers: { Authorization: `Bearer ${formData.whatsappAccessToken}` } }
+      );
+      const data = await res.json() as { id?: string; display_phone_number?: string; error?: { message: string } };
+      if (res.ok && data.id) {
+        toast({
+          title: "✅ Credentials valid",
+          description: `Phone: ${data.display_phone_number ?? formData.whatsappPhoneNumber}. Ready to save.`,
+        });
+        if (data.display_phone_number && !formData.whatsappPhoneNumber) {
+          setFormData(p => ({ ...p, whatsappPhoneNumber: data.display_phone_number! }));
+        }
+      } else {
+        toast({
+          title: "❌ Invalid credentials",
+          description: data.error?.message ?? "Meta API rejected the token. Check Phone Number ID and access token.",
+          variant: "destructive",
+        });
+      }
+    } catch {
+      toast({ title: "Network error", description: "Could not reach Meta API to verify.", variant: "destructive" });
+    } finally {
+      setTesting(false);
+    }
+  };
+
   const save = async () => {
+    if (!formData.whatsappPhoneNumber || !formData.whatsappPhoneNumberId || !formData.whatsappAccessToken) {
+      toast({ title: "All fields required", description: "Fill in all Meta credentials before saving.", variant: "destructive" });
+      return;
+    }
     setSaving(true);
     try {
       await customFetch(`/api/businesses/${business.id}/connect-meta`, {
@@ -266,7 +319,8 @@ function MetaConnectionPanel({ business, onSaved }: { business: { id: number; wh
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(formData),
       });
-      toast({ title: "Meta credentials saved", description: "Webhook is ready." });
+      toast({ title: "✅ Meta API connected", description: "Your WhatsApp Business API is live." });
+      setEditing(false);
       onSaved();
     } catch (err: unknown) {
       toast({ title: "Failed", description: (err as Error).message, variant: "destructive" });
@@ -275,13 +329,24 @@ function MetaConnectionPanel({ business, onSaved }: { business: { id: number; wh
     }
   };
 
-  const webhookUrl = `${window.location.origin}/api/whatsapp/webhook`;
+  // ── Connected State ──
+  if (isConnected && !editing) {
+    return (
+      <div className="space-y-4">
+        <div className="flex items-center gap-3 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+          <CheckCircle2 className="w-5 h-5 text-blue-600 shrink-0" />
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-medium text-blue-900">Meta Cloud API Connected</p>
+            <p className="text-xs text-blue-700 font-mono truncate">{business.whatsappPhoneNumber ?? business.whatsappPhoneNumberId}</p>
+          </div>
+          <Button variant="ghost" size="sm" className="text-blue-700 hover:text-blue-900 shrink-0" onClick={() => setEditing(true)}>
+            <Pencil className="w-3.5 h-3.5 mr-1" /> Edit
+          </Button>
+        </div>
 
-  return (
-    <div className="space-y-4">
-      <div className="p-4 bg-muted/50 rounded-lg border space-y-3">
-        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Webhook Config (paste into Meta)</p>
-        <div className="space-y-2">
+        {/* Webhook info (read-only when connected) */}
+        <div className="p-3 bg-muted/50 rounded-lg border space-y-2">
+          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Meta Webhook Config</p>
           <div>
             <p className="text-xs font-medium mb-1">Webhook URL</p>
             <div className="flex items-center gap-2">
@@ -294,33 +359,98 @@ function MetaConnectionPanel({ business, onSaved }: { business: { id: number; wh
           <div>
             <p className="text-xs font-medium mb-1">Verify Token</p>
             <div className="flex items-center gap-2">
-              <code className="flex-1 text-xs bg-background border rounded px-2 py-1.5 font-mono truncate">{formData.webhookVerifyToken}</code>
-              <Button variant="ghost" size="icon" className="h-7 w-7 shrink-0" onClick={() => copyToClipboard(formData.webhookVerifyToken, "Verify Token")}>
+              <code className="flex-1 text-xs bg-background border rounded px-2 py-1.5 font-mono truncate">{business.webhookVerifyToken}</code>
+              <Button variant="ghost" size="icon" className="h-7 w-7 shrink-0" onClick={() => copyToClipboard(business.webhookVerifyToken ?? "", "Verify Token")}>
                 <Copy className="w-3.5 h-3.5" />
               </Button>
             </div>
           </div>
+          <p className="text-[10px] text-muted-foreground">Subscribe to <code className="font-mono">messages</code> field in Meta Developer Console → WhatsApp → Configuration</p>
         </div>
       </div>
+    );
+  }
 
+  // ── Edit/Setup Form ──
+  return (
+    <div className="space-y-4">
+      {/* Webhook config (shown at top so user can set up Meta first) */}
+      <div className="p-3 bg-muted/50 rounded-lg border space-y-2">
+        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">1. Configure Meta webhook first</p>
+        <div>
+          <p className="text-xs font-medium mb-1">Webhook URL</p>
+          <div className="flex items-center gap-2">
+            <code className="flex-1 text-xs bg-background border rounded px-2 py-1.5 font-mono truncate">{webhookUrl}</code>
+            <Button variant="ghost" size="icon" className="h-7 w-7 shrink-0" onClick={() => copyToClipboard(webhookUrl, "Webhook URL")}>
+              <Copy className="w-3.5 h-3.5" />
+            </Button>
+          </div>
+        </div>
+        <div>
+          <p className="text-xs font-medium mb-1">Verify Token (your token for this business)</p>
+          <div className="flex items-center gap-2">
+            <code className="flex-1 text-xs bg-background border rounded px-2 py-1.5 font-mono truncate">{formData.webhookVerifyToken}</code>
+            <Button variant="ghost" size="icon" className="h-7 w-7 shrink-0" onClick={() => copyToClipboard(formData.webhookVerifyToken, "Verify Token")}>
+              <Copy className="w-3.5 h-3.5" />
+            </Button>
+          </div>
+        </div>
+        <a
+          href="https://developers.facebook.com/apps/"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="inline-flex items-center gap-1 text-xs text-primary hover:underline"
+        >
+          Open Meta Developer Console <ExternalLink className="w-3 h-3" />
+        </a>
+      </div>
+
+      {/* Credentials form */}
       <div className="space-y-3">
-        <div className="grid grid-cols-2 gap-3">
+        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">2. Enter your credentials</p>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div>
-            <label className="text-xs font-medium block mb-1">Phone Number</label>
-            <input className="w-full text-sm border rounded px-3 py-2 bg-background" placeholder="+91 98765..." value={formData.whatsappPhoneNumber} onChange={e => setFormData(p => ({ ...p, whatsappPhoneNumber: e.target.value }))} />
+            <label className="text-xs font-medium block mb-1">Display Phone Number</label>
+            <input
+              className="w-full text-sm border rounded px-3 py-2 bg-background"
+              placeholder="+91 98765 43210"
+              value={formData.whatsappPhoneNumber}
+              onChange={e => setFormData(p => ({ ...p, whatsappPhoneNumber: e.target.value }))}
+            />
           </div>
           <div>
             <label className="text-xs font-medium block mb-1">Phone Number ID</label>
-            <input className="w-full text-sm border rounded px-3 py-2 bg-background font-mono" placeholder="1234567890..." value={formData.whatsappPhoneNumberId} onChange={e => setFormData(p => ({ ...p, whatsappPhoneNumberId: e.target.value }))} />
+            <input
+              className="w-full text-sm border rounded px-3 py-2 bg-background font-mono"
+              placeholder="1234567890123456"
+              value={formData.whatsappPhoneNumberId}
+              onChange={e => setFormData(p => ({ ...p, whatsappPhoneNumberId: e.target.value }))}
+            />
+            <p className="text-[10px] text-muted-foreground mt-0.5">Found in Meta Dev Console → WhatsApp → API Setup</p>
           </div>
         </div>
         <div>
           <label className="text-xs font-medium block mb-1">System User Access Token</label>
-          <input type="password" className="w-full text-sm border rounded px-3 py-2 bg-background font-mono" placeholder="EAAB..." value={formData.whatsappAccessToken} onChange={e => setFormData(p => ({ ...p, whatsappAccessToken: e.target.value }))} />
+          <input
+            type="password"
+            className="w-full text-sm border rounded px-3 py-2 bg-background font-mono"
+            placeholder="EAAB…"
+            value={formData.whatsappAccessToken}
+            onChange={e => setFormData(p => ({ ...p, whatsappAccessToken: e.target.value }))}
+          />
+          <p className="text-[10px] text-muted-foreground mt-0.5">Use a permanent System User token — not the temporary test token</p>
         </div>
-        <div className="flex justify-end">
-          <Button size="sm" onClick={save} disabled={saving}>
-            {saving ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Saving...</> : "Save Credentials"}
+        <div className="flex gap-2 justify-end pt-1">
+          {isConnected && (
+            <Button variant="ghost" size="sm" onClick={() => setEditing(false)}>
+              Cancel
+            </Button>
+          )}
+          <Button size="sm" variant="outline" onClick={testCredentials} disabled={testing || saving}>
+            {testing ? <><Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" /> Testing…</> : "Test Credentials"}
+          </Button>
+          <Button size="sm" onClick={save} disabled={saving || testing}>
+            {saving ? <><Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" /> Saving…</> : "Save & Connect"}
           </Button>
         </div>
       </div>

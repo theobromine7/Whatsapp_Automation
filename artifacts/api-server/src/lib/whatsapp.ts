@@ -1,19 +1,23 @@
 import { logger } from "./logger";
 
+const GRAPH_API_VERSION = "v19.0";
+
+// ─── Send text message ────────────────────────────────────────────────────────
+
 export async function sendWhatsappMessage(
   phoneNumberId: string,
   accessToken: string,
   to: string,
   message: string
 ): Promise<void> {
-  const url = `https://graph.facebook.com/v19.0/${phoneNumberId}/messages`;
+  const url = `https://graph.facebook.com/${GRAPH_API_VERSION}/${phoneNumberId}/messages`;
 
   const body = {
     messaging_product: "whatsapp",
     recipient_type: "individual",
     to,
     type: "text",
-    text: { body: message },
+    text: { body: message, preview_url: false },
   };
 
   const response = await fetch(url, {
@@ -28,22 +32,72 @@ export async function sendWhatsappMessage(
   if (!response.ok) {
     const error = await response.text();
     logger.error({ status: response.status, error }, "Failed to send WhatsApp message");
-    throw new Error(`WhatsApp API error: ${response.status}`);
+    throw new Error(`WhatsApp API error: ${response.status} — ${error}`);
   }
 
   logger.info({ to, phoneNumberId }, "WhatsApp message sent");
 }
 
-/**
- * Upload an image buffer to WhatsApp Media API and return the media ID.
- */
+// ─── Mark message as read ─────────────────────────────────────────────────────
+
+export async function markMetaMessageAsRead(
+  phoneNumberId: string,
+  accessToken: string,
+  messageId: string
+): Promise<void> {
+  const url = `https://graph.facebook.com/${GRAPH_API_VERSION}/${phoneNumberId}/messages`;
+  try {
+    await fetch(url, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${accessToken}`,
+      },
+      body: JSON.stringify({
+        messaging_product: "whatsapp",
+        status: "read",
+        message_id: messageId,
+      }),
+    });
+  } catch (err) {
+    // best-effort — never block message processing
+    logger.warn({ err, messageId }, "Failed to mark message as read");
+  }
+}
+
+// ─── Download media from Meta CDN ─────────────────────────────────────────────
+
+export async function downloadMetaMedia(
+  mediaId: string,
+  accessToken: string
+): Promise<{ buffer: Buffer; mimeType: string }> {
+  // Step 1: get the download URL
+  const metaRes = await fetch(
+    `https://graph.facebook.com/${GRAPH_API_VERSION}/${mediaId}`,
+    { headers: { Authorization: `Bearer ${accessToken}` } }
+  );
+  if (!metaRes.ok) throw new Error(`Meta media lookup failed: ${metaRes.status}`);
+  const meta = await metaRes.json() as { url: string; mime_type: string };
+
+  // Step 2: download the binary
+  const dlRes = await fetch(meta.url, {
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
+  if (!dlRes.ok) throw new Error(`Meta media download failed: ${dlRes.status}`);
+
+  const arrayBuffer = await dlRes.arrayBuffer();
+  return { buffer: Buffer.from(arrayBuffer), mimeType: meta.mime_type };
+}
+
+// ─── Upload media + send image ────────────────────────────────────────────────
+
 async function uploadWhatsappMedia(
   phoneNumberId: string,
   accessToken: string,
   imageBuffer: Buffer,
   mimeType = "image/png"
 ): Promise<string> {
-  const url = `https://graph.facebook.com/v19.0/${phoneNumberId}/media`;
+  const url = `https://graph.facebook.com/${GRAPH_API_VERSION}/${phoneNumberId}/media`;
 
   const formData = new FormData();
   formData.append("messaging_product", "whatsapp");
@@ -67,9 +121,6 @@ async function uploadWhatsappMedia(
   return data.id;
 }
 
-/**
- * Send an image message via Meta Cloud API.
- */
 export async function sendWhatsappImage(
   phoneNumberId: string,
   accessToken: string,
@@ -79,7 +130,7 @@ export async function sendWhatsappImage(
 ): Promise<void> {
   const mediaId = await uploadWhatsappMedia(phoneNumberId, accessToken, imageBuffer);
 
-  const url = `https://graph.facebook.com/v19.0/${phoneNumberId}/messages`;
+  const url = `https://graph.facebook.com/${GRAPH_API_VERSION}/${phoneNumberId}/messages`;
   const body = {
     messaging_product: "whatsapp",
     recipient_type: "individual",

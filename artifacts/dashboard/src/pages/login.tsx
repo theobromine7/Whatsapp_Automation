@@ -51,7 +51,7 @@ export default function Login() {
           </div>
           <h1 className="text-2xl font-bold tracking-tight">Welcome back</h1>
           <p className="text-sm text-muted-foreground text-center">
-            Sign in with your Advize account or NexusAgent credentials
+            Sign in to your Wapp account
           </p>
         </div>
 
@@ -126,7 +126,7 @@ export default function Login() {
         </div>
 
         <p className="text-center text-sm text-muted-foreground mt-5">
-          New to NexusAgent?{" "}
+          New to Wapp?{" "}
           <Link href="/signup" className="text-primary font-medium hover:underline">
             Create an account
           </Link>

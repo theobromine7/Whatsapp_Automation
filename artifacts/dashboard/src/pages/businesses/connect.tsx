@@ -69,7 +69,7 @@ const META_STEPS = [
   {
     step: 4,
     title: "Come back here to register",
-    detail: "Once you have your credentials, return to NexusAgent and register your business.",
+    detail: "Once you have your credentials, return to Wapp and register your business.",
     url: null,
     urlLabel: null,
   },

@@ -45,7 +45,7 @@ export default function Landing() {
             <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center">
               <MessageCircle className="w-4 h-4 text-primary-foreground" />
             </div>
-            <span className="font-bold text-lg tracking-tight">NexusAgent</span>
+            <span className="font-bold text-lg tracking-tight">Wapp</span>
           </div>
           <div className="flex items-center gap-3">
             <Link href="/login">
@@ -120,7 +120,7 @@ export default function Landing() {
       {/* Footer CTA */}
       <section className="py-16 px-6 text-center border-t">
         <h2 className="text-2xl font-bold mb-3">Ready to automate your sales?</h2>
-        <p className="text-muted-foreground mb-6">Join businesses already using NexusAgent on WhatsApp.</p>
+        <p className="text-muted-foreground mb-6">Join businesses already using Wapp on WhatsApp.</p>
         <Link href="/signup">
           <Button size="lg" className="gap-2 px-10">
             Get started free <ArrowRight className="w-4 h-4" />
@@ -129,7 +129,7 @@ export default function Landing() {
       </section>
 
       <footer className="border-t py-6 text-center text-xs text-muted-foreground">
-        © {new Date().getFullYear()} NexusAgent · Built on Advize
+        © {new Date().getFullYear()} Wapp · Built on Advize
       </footer>
     </div>
   );

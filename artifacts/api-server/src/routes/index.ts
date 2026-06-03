@@ -9,6 +9,7 @@ import sessionsRouter from "./sessions";
 import knowledgeRouter from "./knowledge";
 import broadcastsRouter from "./broadcasts";
 import firebaseSyncRouter from "./firebase-sync";
+import accountRouter from "./account";
 
 const router: IRouter = Router();
 
@@ -22,5 +23,6 @@ router.use(sessionsRouter);
 router.use(knowledgeRouter);
 router.use(broadcastsRouter);
 router.use(firebaseSyncRouter);
+router.use(accountRouter);
 
 export default router;

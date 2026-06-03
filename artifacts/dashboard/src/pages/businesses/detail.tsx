@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { useRoute, Link, useLocation } from "wouter";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQueryClient, useMutation } from "@tanstack/react-query";
 import { auth } from "@/lib/firebase";
 import {
   getGetBusinessQueryKey,
@@ -38,6 +38,7 @@ import {
   X,
   Store,
   Clock,
+  Trash2,
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -51,6 +52,17 @@ import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { cn } from "@/lib/utils";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 
 // ─── QR Connection Panel ──────────────────────────────────────────────────────
 
@@ -428,6 +440,25 @@ export default function BusinessDetail() {
     }));
   };
 
+  const deleteBusiness = useMutation({
+    mutationFn: async () => {
+      const token = await auth.currentUser?.getIdToken();
+      const res = await customFetch(`/api/businesses/${businessId}`, {
+        method: "DELETE",
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+      if (!res.ok) throw new Error("Failed to delete business");
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: getListBusinessesQueryKey() });
+      toast({ title: "Business deleted", description: "The business has been permanently removed." });
+      setLocation("/businesses");
+    },
+    onError: () => {
+      toast({ title: "Error", description: "Failed to delete business.", variant: "destructive" });
+    },
+  });
+
   const handleToggle = () => {
     toggleBot.mutate({ id: businessId }, {
       onSuccess: (data) => {
@@ -510,18 +541,45 @@ export default function BusinessDetail() {
             </p>
           </div>
         </div>
-        <Button
-          variant={business.isActive ? "destructive" : "default"}
-          onClick={handleToggle}
-          disabled={toggleBot.isPending}
-          size="sm"
-        >
-          {business.isActive ? (
-            <><PowerOff className="w-4 h-4 mr-2" /> Pause Bot</>
-          ) : (
-            <><Power className="w-4 h-4 mr-2" /> Activate Bot</>
-          )}
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button
+            variant={business.isActive ? "destructive" : "default"}
+            onClick={handleToggle}
+            disabled={toggleBot.isPending}
+            size="sm"
+          >
+            {business.isActive ? (
+              <><PowerOff className="w-4 h-4 mr-2" /> Pause Bot</>
+            ) : (
+              <><Power className="w-4 h-4 mr-2" /> Activate Bot</>
+            )}
+          </Button>
+          <AlertDialog>
+            <AlertDialogTrigger asChild>
+              <Button variant="outline" size="sm" className="border-destructive/50 text-destructive hover:bg-destructive hover:text-destructive-foreground">
+                <Trash2 className="w-4 h-4 mr-2" /> Delete
+              </Button>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Delete business?</AlertDialogTitle>
+                <AlertDialogDescription>
+                  This will permanently delete <strong>{business.name}</strong> and all its conversations, messages, and settings. This cannot be undone.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                <AlertDialogAction
+                  onClick={() => deleteBusiness.mutate()}
+                  disabled={deleteBusiness.isPending}
+                  className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                >
+                  {deleteBusiness.isPending ? "Deleting…" : "Delete business"}
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+        </div>
       </div>
 
       {/* Stats */}

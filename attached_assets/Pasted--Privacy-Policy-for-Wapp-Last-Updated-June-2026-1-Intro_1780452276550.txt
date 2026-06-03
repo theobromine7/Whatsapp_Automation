@@ -1,0 +1,243 @@
+# Privacy Policy for Wapp
+
+Last Updated: June 2026
+
+## 1. Introduction
+
+Wapp ("we," "our," "us") is a WhatsApp automation, broadcasting, customer engagement, and AI communication platform operated by Advize Technology.
+
+This Privacy Policy explains how we collect, use, store, process, and protect your information when you use Wapp and related Advize Technology services.
+
+By using Wapp, you consent to the practices described in this Privacy Policy.
+
+---
+
+## 2. Information We Collect
+
+### Account Information
+
+When you register for Wapp, we may collect:
+
+* Full name
+* Email address
+* Mobile number
+* Business name
+* Business address
+* Profile information
+* Login credentials
+
+### Business Data
+
+We may collect:
+
+* Customer contact information uploaded by users
+* Customer communication records
+* Broadcast campaigns
+* Automation workflows
+* Message templates
+* AI configuration settings
+* Customer interaction history
+
+### Technical Information
+
+We may automatically collect:
+
+* Device information
+* Browser information
+* IP address
+* Operating system
+* Log files
+* Usage analytics
+* Session information
+
+---
+
+## 3. Advize Ecosystem Integration
+
+Wapp operates within the Advize Technology ecosystem.
+
+By creating an account on Wapp:
+
+* Your account may be shared across Advize-operated platforms.
+* Single Sign-On (SSO) may allow access to multiple Advize services using the same credentials.
+* Basic account information may be accessible across Advize products for authentication, account management, support, and service improvement purposes.
+
+Your use of other Advize services may be subject to their respective policies and terms.
+
+---
+
+## 4. WhatsApp Connectivity Data
+
+Depending on your chosen connection method, Wapp may process:
+
+### Official WhatsApp API Connections
+
+* Business account identifiers
+* Template data
+* Message delivery status
+* Customer conversation metadata
+
+### QR-Based Connections
+
+For QR-based WhatsApp Web connections using technologies such as Baileys:
+
+* Session authentication data
+* Device pairing information
+* Connection status information
+
+Wapp does not claim ownership of your WhatsApp account, messages, or contacts.
+
+---
+
+## 5. How We Use Information
+
+We may use information to:
+
+* Provide platform functionality
+* Enable automation features
+* Deliver AI-powered responses
+* Process broadcasts and campaigns
+* Improve service performance
+* Prevent abuse and fraud
+* Provide customer support
+* Generate analytics and reports
+* Comply with legal obligations
+
+---
+
+## 6. AI Features
+
+When AI features are enabled:
+
+* Customer messages may be processed by AI systems.
+* Business knowledge bases may be analyzed to generate responses.
+* AI-generated content may be stored to improve workflow functionality.
+
+Users remain responsible for reviewing AI-generated outputs before relying on them for critical business decisions.
+
+---
+
+## 7. Data Sharing
+
+We do not sell your personal information.
+
+We may share information with:
+
+* Cloud infrastructure providers
+* Authentication providers
+* Analytics providers
+* AI service providers
+* Payment processors
+* Legal authorities when required by law
+
+All third-party providers are expected to maintain appropriate security and confidentiality measures.
+
+---
+
+## 8. Data Retention
+
+We retain information for as long as necessary to:
+
+* Provide services
+* Maintain account functionality
+* Resolve disputes
+* Enforce agreements
+* Meet legal obligations
+
+Users may request account deletion, subject to applicable legal and operational requirements.
+
+---
+
+## 9. Security Measures
+
+Wapp implements reasonable security measures including:
+
+* Encrypted communications
+* Access controls
+* Authentication safeguards
+* Monitoring systems
+* Infrastructure security practices
+
+However, no online service can guarantee complete security.
+
+Users are responsible for maintaining secure passwords and protecting account access.
+
+---
+
+## 10. User Responsibilities
+
+Users are responsible for:
+
+* Obtaining proper customer consent
+* Complying with applicable privacy laws
+* Protecting customer information
+* Using the platform lawfully
+
+Wapp is not responsible for user misuse of customer data.
+
+---
+
+## 11. Cookies and Analytics
+
+We may use cookies and similar technologies to:
+
+* Maintain user sessions
+* Improve performance
+* Analyze platform usage
+* Enhance user experience
+
+Users may manage certain cookie preferences through their browser settings.
+
+---
+
+## 12. Children's Privacy
+
+Wapp is intended for business users and is not directed toward individuals under the age of 18.
+
+We do not knowingly collect personal information from children.
+
+---
+
+## 13. International Data Processing
+
+Your information may be processed and stored on servers located in different jurisdictions depending on service providers and infrastructure requirements.
+
+By using Wapp, you consent to such processing and transfers.
+
+---
+
+## 14. Your Rights
+
+Subject to applicable laws, you may have the right to:
+
+* Access your information
+* Correct inaccurate information
+* Request deletion of information
+* Request data portability
+* Withdraw certain consents
+
+Requests may be submitted through our support channels.
+
+---
+
+## 15. Changes to this Privacy Policy
+
+We may update this Privacy Policy periodically.
+
+Updated versions will be published on the Wapp website or application.
+
+Continued use of the Service after updates constitutes acceptance of the revised policy.
+
+---
+
+## 16. Contact Us
+
+For privacy-related questions, requests, or concerns:
+
+Advize Technology
+
+Email: [contact@advize.in](mailto:contact@advize.in)
+
+Support Team: [contact@advize.in](mailto:contact@advize.in)
+
+By using Wapp, you acknowledge that you have read and understood this Privacy Policy.

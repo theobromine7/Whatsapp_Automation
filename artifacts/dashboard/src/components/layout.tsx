@@ -6,22 +6,36 @@ import {
   PlusCircle,
   Zap,
   LogOut,
+  Settings,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useAuth } from "@/contexts/AuthContext";
 import { logout } from "@/lib/firebase";
+import { useQueryClient } from "@tanstack/react-query";
 
 const NAV = [
   { href: "/inbox", icon: MessageSquare, label: "Inbox" },
   { href: "/dashboard", icon: LayoutDashboard, label: "Dashboard" },
   { href: "/businesses", icon: Building2, label: "Businesses" },
   { href: "/businesses/new", icon: PlusCircle, label: "Add Business" },
+  { href: "/settings", icon: Settings, label: "Settings" },
 ];
 
 export function Layout({ children }: { children: React.ReactNode }) {
-  const [location] = useLocation();
+  const [location, setLocation] = useLocation();
   const { user } = useAuth();
+  const queryClient = useQueryClient();
+
+  const handleSignOut = async () => {
+    try {
+      await logout();
+      queryClient.clear();
+      setLocation("/login");
+    } catch {
+      // ignore
+    }
+  };
 
   const isActive = (href: string) => {
     if (href === "/inbox") return location === "/inbox" || location === "/";
@@ -71,7 +85,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
           <Tooltip delayDuration={0}>
             <TooltipTrigger asChild>
               <button
-                onClick={() => logout()}
+                onClick={handleSignOut}
                 className="w-9 h-9 rounded-full bg-[#2a3942] border border-[#3a4a54] flex items-center justify-center text-[#8696a0] hover:bg-red-900/40 hover:text-red-400 hover:border-red-800 transition-all shrink-0"
               >
                 <LogOut className="w-4 h-4" />

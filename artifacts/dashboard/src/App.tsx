@@ -14,6 +14,9 @@ import NewBusiness from "@/pages/businesses/new";
 import BusinessDetail from "@/pages/businesses/detail";
 import ConnectWhatsApp from "@/pages/businesses/connect";
 import ConversationDetail from "@/pages/conversations/detail";
+import Settings from "@/pages/settings";
+import Terms from "@/pages/terms";
+import Privacy from "@/pages/privacy";
 import NotFound from "@/pages/not-found";
 
 const queryClient = new QueryClient();
@@ -50,6 +53,8 @@ function Router() {
       {/* Public pages */}
       <Route path="/login" component={Login} />
       <Route path="/signup" component={Signup} />
+      <Route path="/terms" component={Terms} />
+      <Route path="/privacy" component={Privacy} />
 
       {/* Protected app pages — inside sidebar layout */}
       <Route>
@@ -68,6 +73,9 @@ function Router() {
               <Route path="/conversations/:businessId/:conversationId" component={ConversationDetail} />
               <Route path="/businesses/:id">
                 {() => <PageLayout><BusinessDetail /></PageLayout>}
+              </Route>
+              <Route path="/settings">
+                <PageLayout><Settings /></PageLayout>
               </Route>
               <Route component={NotFound} />
             </Switch>

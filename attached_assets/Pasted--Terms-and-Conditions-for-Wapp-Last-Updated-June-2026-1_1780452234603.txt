@@ -1,0 +1,205 @@
+# Terms and Conditions for Wapp
+
+Last Updated: June 2026
+
+## 1. Acceptance of Terms
+
+By accessing or using Wapp ("Service"), you agree to be bound by these Terms and Conditions. If you do not agree to these Terms, you must not use the Service.
+
+Wapp is a WhatsApp automation, customer engagement, broadcasting, and communication platform operated under the Advize ecosystem.
+
+## 2. Description of Service
+
+Wapp provides tools including but not limited to:
+
+* WhatsApp automation
+* AI-powered customer support
+* Customer engagement tools
+* Message broadcasting
+* Lead management
+* Business communication workflows
+* Analytics and reporting
+* Integration with third-party services
+
+Wapp may provide connectivity through:
+
+* Official WhatsApp Business Platform APIs
+* WhatsApp Business Solution Providers
+* QR-based WhatsApp Web connections powered by third-party technologies including Baileys or similar technologies
+
+Service availability and features may vary depending on the connection method selected.
+
+## 3. Advize Ecosystem Account
+
+Wapp operates within the Advize Technology infrastructure.
+
+By creating an account on Wapp:
+
+* You become a user of the Advize Technology ecosystem.
+* Your account credentials may be used across other Advize Technology products and services.
+* Single Sign-On (SSO) functionality may allow access to multiple Advize-operated platforms using the same account credentials.
+* Account information may be shared among Advize-owned products for authentication, security, account management, and service improvement purposes.
+
+Users are responsible for maintaining the confidentiality of their login credentials.
+
+## 4. User Responsibilities
+
+You agree to:
+
+* Provide accurate information.
+* Maintain the security of your account.
+* Comply with applicable laws and regulations.
+* Obtain necessary customer consent before sending messages.
+* Respect recipient privacy rights.
+* Use the Service only for lawful business purposes.
+
+You are solely responsible for all content, messages, broadcasts, and communications sent through your account.
+
+## 5. WhatsApp Compliance
+
+Users must comply with:
+
+* WhatsApp Terms of Service
+* WhatsApp Business Policies
+* Meta Platform Policies
+* Applicable anti-spam laws
+* Consumer protection regulations
+
+Wapp does not control WhatsApp's policies and cannot guarantee continued WhatsApp account access.
+
+Any suspension, restriction, or termination imposed by WhatsApp or Meta remains the user's responsibility.
+
+## 6. QR-Based Connections and Baileys Integrations
+
+Certain features may use QR-code-based WhatsApp connections through technologies such as Baileys.
+
+Users acknowledge that:
+
+* Such connections are not official WhatsApp Business API connections.
+* WhatsApp may modify, limit, restrict, or discontinue support for such connection methods at any time.
+* Session interruptions may occur.
+* Features may become unavailable due to changes made by WhatsApp.
+
+Wapp does not guarantee uninterrupted availability of QR-based connection methods.
+
+## 7. Broadcasting and Messaging
+
+Users must:
+
+* Send messages only to recipients who have provided appropriate consent.
+* Avoid spam, phishing, harassment, scams, or deceptive practices.
+* Honor opt-out requests promptly.
+
+Wapp reserves the right to suspend accounts engaging in abusive messaging behavior.
+
+## 8. Artificial Intelligence Features
+
+Wapp may provide AI-powered automation and response generation.
+
+Users acknowledge that:
+
+* AI-generated responses may contain inaccuracies.
+* Users remain responsible for reviewing automated workflows.
+* Wapp does not guarantee accuracy, completeness, or suitability of AI-generated content.
+
+## 9. Data Storage and Security
+
+Wapp implements reasonable security measures to protect user data.
+
+However, no system can guarantee absolute security.
+
+Users acknowledge and accept the inherent risks associated with internet-based services.
+
+## 10. Service Availability
+
+Wapp strives to maintain service availability but does not guarantee:
+
+* Continuous uptime
+* Error-free operation
+* Uninterrupted access
+
+Maintenance, updates, third-party outages, or technical issues may affect service availability.
+
+## 11. Payments and Subscriptions
+
+Subscription fees, setup fees, and usage-based charges are payable according to the selected plan.
+
+Unless otherwise stated:
+
+* Payments are non-refundable.
+* Failure to pay may result in service suspension.
+* Pricing may change with prior notice.
+
+## 12. Intellectual Property
+
+All software, branding, designs, technology, and content associated with Wapp and Advize remain the property of Advize and its licensors.
+
+Users receive a limited, non-exclusive, revocable license to use the Service.
+
+## 13. Prohibited Activities
+
+Users may not:
+
+* Send spam or unsolicited bulk communications.
+* Violate WhatsApp policies.
+* Distribute malware.
+* Engage in fraud or deceptive practices.
+* Reverse engineer the platform.
+* Attempt unauthorized access to systems.
+* Use the platform for illegal activities.
+
+Violation may result in immediate account suspension or termination.
+
+## 14. Limitation of Liability
+
+To the maximum extent permitted by law, Wapp, Advize, its owners, employees, affiliates, and partners shall not be liable for:
+
+* Loss of profits
+* Loss of customers
+* Loss of business opportunities
+* Service interruptions
+* Data loss
+* Third-party platform restrictions
+* WhatsApp account suspensions
+
+Use of the Service is at your own risk.
+
+## 15. Indemnification
+
+Users agree to indemnify and hold harmless Wapp and Advize from any claims, liabilities, damages, losses, or expenses arising from:
+
+* User conduct
+* User content
+* Violation of these Terms
+* Violation of applicable laws or third-party rights
+
+## 16. Termination
+
+Wapp may suspend or terminate access at any time if:
+
+* These Terms are violated.
+* Fraudulent activity is detected.
+* Platform abuse occurs.
+* Legal or regulatory obligations require action.
+
+## 17. Modifications
+
+Wapp reserves the right to modify these Terms at any time.
+
+Continued use of the Service after modifications constitutes acceptance of the revised Terms.
+
+## 18. Governing Law
+
+These Terms shall be governed by and interpreted in accordance with the laws of India.
+
+Any disputes shall be subject to the exclusive jurisdiction of courts located in Uttar Pradesh, India.
+
+## 19. Contact Information
+
+For questions regarding these Terms, users may contact:
+
+Advize Support
+
+[contact@advize.in](mailto:support@advize.in)
+
+By using Wapp, you acknowledge that you have read, understood, and agreed to these Terms and Conditions.

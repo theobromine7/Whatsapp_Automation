@@ -292,4 +292,59 @@ router.post("/conversations/:id/owner-message", requireAuth, async (req, res): P
   }
 });
 
+// Owner sends an image from the dashboard
+router.post("/conversations/:id/owner-media", requireAuth, async (req, res): Promise<void> => {
+  const id = parseInt(String(req.params["id"] ?? ""), 10);
+  if (isNaN(id)) { res.status(400).json({ error: "Invalid conversation ID" }); return; }
+
+  const { data, mimeType, caption } = req.body as { data?: string; mimeType?: string; caption?: string };
+  if (!data || !mimeType) { res.status(400).json({ error: "data and mimeType are required" }); return; }
+
+  try {
+    const [conv] = await db
+      .select()
+      .from(whatsappConversationsTable)
+      .where(eq(whatsappConversationsTable.id, id));
+    if (!conv) { res.status(404).json({ error: "Conversation not found" }); return; }
+
+    const [business] = await db
+      .select()
+      .from(businessesTable)
+      .where(and(eq(businessesTable.id, conv.businessId), eq(businessesTable.ownerUid, req.user!.uid)));
+    if (!business) { res.status(403).json({ error: "Access denied" }); return; }
+
+    await db
+      .update(whatsappConversationsTable)
+      .set({ aiState: "OWNER_TAKEN_OVER", ownerLastMessageAt: new Date(), pendingHumanReview: false })
+      .where(eq(whatsappConversationsTable.id, id));
+
+    const content = caption ? `📷 ${caption}` : "📷 Photo";
+    const [message] = await db
+      .insert(whatsappMessagesTable)
+      .values({ conversationId: id, role: "owner", content })
+      .returning();
+
+    setImmediate(async () => {
+      try {
+        const base64 = data.includes(",") ? data.split(",")[1]! : data;
+        const imageBuffer = Buffer.from(base64, "base64");
+        if (business.connectionType === "meta_cloud" && business.whatsappPhoneNumberId && business.whatsappAccessToken) {
+          const { sendWhatsappImage } = await import("../lib/whatsapp");
+          await sendWhatsappImage(business.whatsappPhoneNumberId, business.whatsappAccessToken, conv.customerPhone, imageBuffer, caption);
+        } else if (business.connectionType === "qr_session") {
+          const { sendImageViaSession } = await import("../lib/session-manager");
+          await sendImageViaSession(business.id, conv.customerJid ?? conv.customerPhone, imageBuffer, caption);
+        }
+      } catch (err) {
+        logger.warn({ err, businessId: business.id, conversationId: id }, "Owner image dispatch failed (non-fatal)");
+      }
+    });
+
+    res.status(201).json(message);
+  } catch (err) {
+    req.log.error({ err }, "Failed to send owner media");
+    res.status(500).json({ error: "Failed to send media" });
+  }
+});
+
 export default router;

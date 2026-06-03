@@ -21,6 +21,9 @@ import {
   User,
   AlertTriangle,
   X,
+  CheckCheck,
+  Paperclip,
+  ImageIcon,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -303,8 +306,10 @@ function ChatView({
 }) {
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const queryClient = useQueryClient();
   const [inputText, setInputText] = useState("");
+  const [mediaPreview, setMediaPreview] = useState<{ dataUrl: string; mimeType: string; caption: string } | null>(null);
 
   const cfg = getStateConfig(conv.aiState);
   const StripIcon = cfg.stripIcon;
@@ -351,6 +356,35 @@ function ChatView({
     },
   });
 
+  const sendOwnerMedia = useMutation({
+    mutationFn: ({ data, mimeType, caption }: { data: string; mimeType: string; caption: string }) =>
+      customFetch(`/api/conversations/${conv.id}/owner-media`, {
+        method: "POST",
+        body: JSON.stringify({ data, mimeType, caption: caption || undefined }),
+      }),
+    onSuccess: () => {
+      setMediaPreview(null);
+      queryClient.invalidateQueries({ queryKey: getListConversationMessagesQueryKey(conv.id) });
+      queryClient.invalidateQueries({ queryKey: ["conversations-all"] });
+    },
+  });
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      setMediaPreview({ dataUrl: reader.result as string, mimeType: file.type, caption: "" });
+    };
+    reader.readAsDataURL(file);
+    e.target.value = "";
+  };
+
+  const handleSendMedia = () => {
+    if (!mediaPreview || sendOwnerMedia.isPending) return;
+    sendOwnerMedia.mutate({ data: mediaPreview.dataUrl, mimeType: mediaPreview.mimeType, caption: mediaPreview.caption });
+  };
+
   const handleSend = () => {
     const text = inputText.trim();
     if (!text || sendOwnerMessage.isPending) return;
@@ -369,7 +403,7 @@ function ChatView({
   }, [messages]);
 
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex flex-col h-full relative">
       {/* Chat header */}
       <div className="h-[60px] bg-[#f0f2f5] border-b border-[#e9edef] px-5 flex items-center gap-3 shrink-0">
         <div className={cn("w-10 h-10 rounded-full flex items-center justify-center text-white font-semibold text-sm shrink-0", avatarColor(conv.id))}>
@@ -448,13 +482,24 @@ function ChatView({
                         : "bg-white text-[#111b21] rounded-bl-sm"
                     )}
                   >
-                    <p className="whitespace-pre-wrap break-words leading-relaxed">{msg.content}</p>
+                    {msg.content.startsWith("📷") ? (
+                      <div className="flex items-center gap-2 min-w-[120px]">
+                        <div className={cn("w-9 h-9 rounded-xl flex items-center justify-center shrink-0", isOwner ? "bg-white/10" : "bg-black/5")}>
+                          <ImageIcon className={cn("w-5 h-5", isOwner ? "text-white/70" : "text-[#667781]")} />
+                        </div>
+                        <span className={cn("text-sm", isOwner ? "text-white/90" : "text-[#111b21]")}>
+                          {msg.content === "📷 Photo" ? "Photo" : msg.content.replace("📷 ", "")}
+                        </span>
+                      </div>
+                    ) : (
+                      <p className="whitespace-pre-wrap break-words leading-relaxed">{msg.content}</p>
+                    )}
                     <div className={cn("flex items-center gap-1 mt-0.5", isRight ? "justify-end" : "justify-start")}>
                       <span className={cn("text-[10px]", isOwner ? "text-white/60" : "text-[#667781]")}>
                         {format(new Date(msg.createdAt), "h:mm a")}
                       </span>
                       {isAI && <Bot className="w-2.5 h-2.5 text-[#667781]" />}
-                      {isOwner && <UserCheck className="w-2.5 h-2.5 text-white/60" />}
+                      {isOwner && <CheckCheck className="w-3.5 h-3.5 text-[#53bdeb]" />}
                     </div>
                   </div>
                 </div>
@@ -514,8 +559,53 @@ function ChatView({
           )}
         </div>
 
+        {/* Image preview modal */}
+        {mediaPreview && (
+          <div className="absolute inset-0 z-50 bg-black/70 flex items-center justify-center p-4">
+            <div className="bg-white rounded-2xl overflow-hidden shadow-2xl w-full max-w-sm">
+              <div className="bg-[#f0f2f5] px-4 py-3 flex items-center justify-between border-b border-[#e9edef]">
+                <span className="font-semibold text-[#111b21] text-sm">Send Photo</span>
+                <button onClick={() => setMediaPreview(null)} className="text-[#667781] hover:text-[#111b21]">
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+              <div className="p-4">
+                <img src={mediaPreview.dataUrl} alt="preview" className="w-full max-h-64 object-contain rounded-xl bg-[#f0f2f5]" />
+                <input
+                  className="w-full mt-3 bg-[#f0f2f5] rounded-xl px-4 py-2.5 text-sm text-[#111b21] placeholder-[#8696a0] outline-none"
+                  placeholder="Add a caption… (optional)"
+                  value={mediaPreview.caption}
+                  onChange={(e) => setMediaPreview({ ...mediaPreview, caption: e.target.value })}
+                  onKeyDown={(e) => { if (e.key === "Enter") handleSendMedia(); }}
+                />
+              </div>
+              <div className="px-4 pb-4 flex gap-2">
+                <Button variant="outline" className="flex-1" onClick={() => setMediaPreview(null)}>Cancel</Button>
+                <Button className="flex-1 gap-2" onClick={handleSendMedia} disabled={sendOwnerMedia.isPending}>
+                  <Send className="w-4 h-4" />
+                  {sendOwnerMedia.isPending ? "Sending…" : "Send"}
+                </Button>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Message input */}
         <div className="px-3 pb-3 flex items-end gap-2">
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/*"
+            className="hidden"
+            onChange={handleFileChange}
+          />
+          <button
+            className="w-10 h-10 rounded-full bg-white border border-[#e9edef] flex items-center justify-center text-[#8696a0] hover:text-primary hover:border-primary/30 transition-colors shrink-0"
+            onClick={() => fileInputRef.current?.click()}
+            title="Send photo"
+          >
+            <Paperclip className="w-4 h-4" />
+          </button>
           <textarea
             ref={inputRef}
             rows={1}
@@ -617,9 +707,35 @@ function ConvItem({
 
 // ─── Main Inbox Page ──────────────────────────────────────────────────────────
 
+type FilterCategory = "ALL" | "LEADS" | "CUSTOMERS" | "PERSONAL" | "FAMILY" | "STAFF" | "SUPPLIER" | "REVIEW";
+
+const FILTER_CHIPS: { id: FilterCategory; label: string }[] = [
+  { id: "ALL",      label: "All" },
+  { id: "REVIEW",   label: "Review" },
+  { id: "LEADS",    label: "Leads" },
+  { id: "CUSTOMERS",label: "Customers" },
+  { id: "PERSONAL", label: "Personal" },
+  { id: "FAMILY",   label: "Family" },
+  { id: "STAFF",    label: "Staff" },
+  { id: "SUPPLIER", label: "Supplier" },
+];
+
+function matchesFilter(conv: ConversationListItem, cat: FilterCategory): boolean {
+  if (cat === "ALL") return true;
+  if (cat === "REVIEW") return conv.pendingHumanReview;
+  if (cat === "LEADS") return conv.contactType === "SALES_LEAD" || conv.contactTag === "LEAD";
+  if (cat === "CUSTOMERS") return conv.contactType === "CUSTOMER" || conv.contactTag === "CUSTOMER";
+  if (cat === "PERSONAL") return conv.contactType === "PERSONAL_CONTACT" || conv.contactTag === "PERSONAL";
+  if (cat === "FAMILY") return conv.contactTag === "FAMILY";
+  if (cat === "STAFF") return conv.contactTag === "STAFF";
+  if (cat === "SUPPLIER") return conv.contactTag === "SUPPLIER";
+  return true;
+}
+
 export default function Inbox() {
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [search, setSearch] = useState("");
+  const [filterCat, setFilterCat] = useState<FilterCategory>("ALL");
   const queryClient = useQueryClient();
 
   const { data: conversations, isLoading } = useQuery<ConversationListItem[]>({
@@ -653,12 +769,12 @@ export default function Inbox() {
 
   const filtered = (conversations ?? []).filter((c) => {
     const q = search.toLowerCase();
-    return (
+    const matchesSearch =
       !q ||
       (c.customerName ?? "").toLowerCase().includes(q) ||
       c.customerPhone.includes(q) ||
-      (c.businessName ?? "").toLowerCase().includes(q)
-    );
+      (c.businessName ?? "").toLowerCase().includes(q);
+    return matchesSearch && matchesFilter(c, filterCat);
   });
 
   const selected = filtered.find((c) => c.id === selectedId) ?? null;
@@ -680,7 +796,7 @@ export default function Inbox() {
         </div>
 
         {/* Search */}
-        <div className="px-3 py-2 bg-white border-b border-[#e9edef] shrink-0">
+        <div className="px-3 pt-2 pb-1.5 bg-white border-b border-[#e9edef] shrink-0">
           <div className="bg-[#f0f2f5] rounded-full flex items-center gap-2 px-3 py-1.5">
             <Search className="w-4 h-4 text-[#54656f] shrink-0" />
             <input
@@ -689,6 +805,34 @@ export default function Inbox() {
               value={search}
               onChange={(e) => setSearch(e.target.value)}
             />
+          </div>
+          {/* Filter chips */}
+          <div className="flex gap-1.5 mt-2 overflow-x-auto pb-1 scrollbar-none">
+            {FILTER_CHIPS.map((chip) => {
+              const count = chip.id === "ALL"
+                ? (conversations?.length ?? 0)
+                : (conversations ?? []).filter((c) => matchesFilter(c, chip.id)).length;
+              if (chip.id !== "ALL" && count === 0) return null;
+              return (
+                <button
+                  key={chip.id}
+                  onClick={() => setFilterCat(chip.id)}
+                  className={cn(
+                    "shrink-0 text-[11px] px-2.5 py-1 rounded-full border font-medium transition-colors",
+                    filterCat === chip.id
+                      ? "bg-[#00a884] border-[#00a884] text-white"
+                      : "bg-white border-[#e9edef] text-[#54656f] hover:bg-[#f5f6f6]"
+                  )}
+                >
+                  {chip.label}
+                  {count > 0 && (
+                    <span className={cn("ml-1", filterCat === chip.id ? "opacity-80" : "opacity-60")}>
+                      {count}
+                    </span>
+                  )}
+                </button>
+              );
+            })}
           </div>
         </div>
 

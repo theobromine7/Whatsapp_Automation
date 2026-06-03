@@ -28,10 +28,8 @@ router.get("/whatsapp/webhook", async (req, res): Promise<void> => {
     return;
   }
 
-  const businesses = await db
-    .select()
-    .from(businessesTable)
-    .where(eq(businessesTable.isActive, true));
+  // Search ALL businesses — isActive may still be false during initial Meta setup
+  const businesses = await db.select().from(businessesTable);
 
   const matching = businesses.find((b) => b.webhookVerifyToken === token);
 

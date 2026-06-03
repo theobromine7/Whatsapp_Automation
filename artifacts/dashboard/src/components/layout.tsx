@@ -52,8 +52,8 @@ export function Layout({ children }: { children: React.ReactNode }) {
       {/* Dark icon sidebar */}
       <aside className="w-[68px] shrink-0 bg-[#1f2c34] flex flex-col items-center py-3 gap-1 z-20">
         {/* Logo */}
-        <div className="w-10 h-10 bg-primary rounded-xl flex items-center justify-center mb-4 shrink-0">
-          <Zap className="w-5 h-5 text-white" />
+        <div className="w-10 h-10 mb-4 shrink-0">
+          <img src="/logo.png" alt="Wapp" className="w-full h-full object-contain rounded-xl" />
         </div>
 
         <div className="flex-1 flex flex-col items-center gap-1 w-full px-2">

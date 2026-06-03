@@ -49,9 +49,7 @@ export default function Signup() {
       <div className="w-full max-w-sm">
         {/* Logo */}
         <div className="flex flex-col items-center mb-8 gap-2">
-          <div className="w-12 h-12 rounded-xl bg-primary flex items-center justify-center shadow-md">
-            <MessageCircle className="w-6 h-6 text-primary-foreground" />
-          </div>
+          <img src="/logo.png" alt="Wapp" className="w-16 h-16 object-contain rounded-2xl shadow-md" />
           <h1 className="text-2xl font-bold tracking-tight">Create your account</h1>
           <p className="text-sm text-muted-foreground text-center">
             Already on Advize.store? Use the same email — your store syncs automatically.

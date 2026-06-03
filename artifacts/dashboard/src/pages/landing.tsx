@@ -42,9 +42,7 @@ export default function Landing() {
       <header className="border-b sticky top-0 bg-background/80 backdrop-blur z-10">
         <div className="max-w-6xl mx-auto px-6 h-16 flex items-center justify-between">
           <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center">
-              <MessageCircle className="w-4 h-4 text-primary-foreground" />
-            </div>
+            <img src="/logo.png" alt="Wapp" className="w-8 h-8 object-contain rounded-lg" />
             <span className="font-bold text-lg tracking-tight">Wapp</span>
           </div>
           <div className="flex items-center gap-3">

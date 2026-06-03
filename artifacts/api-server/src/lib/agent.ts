@@ -216,12 +216,26 @@ function parseStructuredResponse(
     confidence = typeof parsed.confidence === "number"
       ? Math.max(0, Math.min(1, parsed.confidence))
       : 1.0;
-    text = typeof parsed.reply === "string" && parsed.reply.trim()
-      ? parsed.reply.trim()
-      : raw;
+
+    if (typeof parsed.reply === "string" && parsed.reply.trim()) {
+      text = parsed.reply.trim();
+    } else {
+      // reply field missing or empty — log and use safe fallback
+      logger.warn({ raw }, "Gemini JSON missing reply field — using fallback");
+      text = "How can I help you?";
+    }
   } catch {
-    // Non-JSON response — use raw text with high confidence (don't block it)
-    confidence = 0.9;
+    // Gemini returned plain text instead of JSON — use it directly if it looks
+    // like a real sentence, otherwise fall back to a safe default
+    const looksLikeJson = raw.trim().startsWith("{") || raw.trim().startsWith("[");
+    if (!looksLikeJson && raw.trim().length > 0) {
+      text = raw.trim();
+      confidence = 0.9;
+    } else {
+      logger.warn({ raw }, "Gemini returned unparseable response — using fallback");
+      text = "How can I help you?";
+      confidence = 0.5;
+    }
   }
 
   const msgLower = customerMessage.toLowerCase();

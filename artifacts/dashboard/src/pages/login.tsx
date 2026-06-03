@@ -46,7 +46,7 @@ export default function Login() {
       <div className="w-full max-w-sm">
         {/* Logo */}
         <div className="flex flex-col items-center mb-8 gap-2">
-          <img src="/logo.png" alt="Wapp" className="w-16 h-16 object-contain rounded-2xl shadow-md" />
+          <img src="/logo.png" alt="Wapp" className="w-24 h-24 object-contain" />
           <h1 className="text-2xl font-bold tracking-tight">Welcome back</h1>
           <p className="text-sm text-muted-foreground text-center">
             Sign in to your Wapp account

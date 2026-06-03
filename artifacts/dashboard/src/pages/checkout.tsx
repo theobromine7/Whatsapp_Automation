@@ -78,24 +78,18 @@ export default function Checkout() {
       }
 
       // 2. Create order on backend
-      const orderRes = await customFetch("/api/payments/orders", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ plan: planId, name, email, phone }),
-      });
-
-      if (!orderRes.ok) {
-        const err = await orderRes.json().catch(() => ({ error: "Unknown error" })) as { error?: string };
-        throw new Error(err.error ?? "Could not create order");
-      }
-
-      const order = await orderRes.json() as {
+      // customFetch throws ApiError on non-2xx, and returns the parsed body on success
+      const order = await customFetch<{
         orderId: string;
         amount: number;
         currency: string;
         keyId: string;
         planLabel: string;
-      };
+      }>("/api/payments/orders", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ plan: planId, name, email, phone }),
+      });
 
       // 3. Open Razorpay modal
       const rzp = new window.Razorpay({
@@ -109,20 +103,21 @@ export default function Checkout() {
         theme: { color: "#00a884" },
         handler: async (response) => {
           try {
-            // 4. Verify payment on backend
-            const verifyRes = await customFetch("/api/payments/verify", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({
-                razorpay_order_id: response.razorpay_order_id,
-                razorpay_payment_id: response.razorpay_payment_id,
-                razorpay_signature: response.razorpay_signature,
-                plan: planId,
-              }),
-            });
+            // 4. Verify payment on backend — customFetch returns parsed body or throws
+            const verified = await customFetch<{ verified: boolean; paymentId: string }>(
+              "/api/payments/verify",
+              {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  razorpay_order_id: response.razorpay_order_id,
+                  razorpay_payment_id: response.razorpay_payment_id,
+                  razorpay_signature: response.razorpay_signature,
+                  plan: planId,
+                }),
+              },
+            );
 
-            if (!verifyRes.ok) throw new Error("Verification failed");
-            const verified = await verifyRes.json() as { verified: boolean; paymentId: string };
             if (verified.verified) {
               setPaymentId(verified.paymentId);
               setDone(true);

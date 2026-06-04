@@ -303,29 +303,42 @@ export async function startSession(businessId: number): Promise<void> {
 export async function stopSession(businessId: number): Promise<void> {
   clearRestartTimer(businessId);
   const entry = sessions.get(businessId);
-  if (!entry) return;
 
-  try {
-    (entry.socket as { end?: () => void })?.end?.();
-  } catch {
-    // ignore
-  }
+  if (entry) {
+    // Notify any open SSE clients before closing them
+    broadcastToSSE(businessId, { type: "disconnected", reason: "manual" });
 
-  for (const client of entry.sseClients) {
+    // Graceful Baileys logout — tells WhatsApp server to remove the linked device.
+    // Fall back to a plain end() if logout isn't available.
     try {
-      client.end();
+      await (entry.socket as { logout?: () => Promise<void> })?.logout?.();
     } catch {
-      // ignore
+      try {
+        (entry.socket as { end?: () => void })?.end?.();
+      } catch { /* ignore */ }
     }
+
+    for (const client of entry.sseClients) {
+      try { client.end(); } catch { /* ignore */ }
+    }
+
+    entry.sseClients.clear();
+    sessions.delete(businessId);
   }
 
-  entry.sseClients.clear();
-  sessions.delete(businessId);
   sessionSavedContacts.delete(businessId);
 
+  // Delete session files so the server won't auto-restore this session on restart
+  const sessionDir = path.join(SESSIONS_DIR, String(businessId));
+  if (fs.existsSync(sessionDir)) {
+    fs.rmSync(sessionDir, { recursive: true, force: true });
+    logger.info({ businessId }, "Session files deleted on disconnect");
+  }
+
+  // Always update DB — even when there was no in-memory entry (e.g. after server restart)
   await db
     .update(businessesTable)
-    .set({ sessionStatus: "disconnected", updatedAt: new Date() })
+    .set({ sessionStatus: "disconnected", connectedPhone: null, updatedAt: new Date() })
     .where(eq(businessesTable.id, businessId));
 }
 

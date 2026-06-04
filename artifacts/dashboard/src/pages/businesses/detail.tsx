@@ -109,10 +109,11 @@ function QRConnectionPanel({ businessId, onConnected }: { businessId: number; on
           setPhase("starting");
           setQrDataUrl(null);
         } else if (data.type === "disconnected") {
-          // Only close on explicit logout; otherwise keep stream alive
-          if (data.reason === "logged_out") {
+          // "logged_out" = removed from phone; "manual" = clicked Disconnect; others = retry
+          if (data.reason === "logged_out" || data.reason === "manual") {
             setPhase("idle");
             setQrDataUrl(null);
+            setConnectedPhone(null);
             es.close();
           } else {
             setPhase("starting");
@@ -146,7 +147,11 @@ function QRConnectionPanel({ businessId, onConnected }: { businessId: number; on
 
   const disconnect = async () => {
     eventSourceRef.current?.close();
-    await customFetch(`/api/sessions/${businessId}/disconnect`, { method: "POST" });
+    try {
+      await customFetch(`/api/sessions/${businessId}/disconnect`, { method: "POST" });
+    } catch {
+      // Even if the API call fails, reset the UI — the SSE stream is already closed
+    }
     setPhase("idle");
     setQrDataUrl(null);
     setConnectedPhone(null);
@@ -784,7 +789,11 @@ export default function BusinessDetail() {
                       <p className="text-xs text-green-700 font-mono">+{business.connectedPhone}</p>
                     </div>
                     <Button variant="ghost" size="sm" className="ml-auto text-red-600" onClick={async () => {
-                      await customFetch(`/api/sessions/${businessId}/disconnect`, { method: "POST" });
+                      try {
+                        await customFetch(`/api/sessions/${businessId}/disconnect`, { method: "POST" });
+                      } catch {
+                        // Still refresh — DB is updated server-side even on partial failure
+                      }
                       refreshBusiness();
                     }}>
                       <WifiOff className="w-3.5 h-3.5 mr-1" /> Disconnect

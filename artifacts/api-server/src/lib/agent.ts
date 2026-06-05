@@ -152,6 +152,7 @@ Set needsOwner to false for all normal product, price, availability, or FAQ ques
         systemInstruction,
         maxOutputTokens: 300,
         responseMimeType: "application/json",
+        thinkingConfig: { thinkingBudget: 0 }, // disable thinking — reduces latency from ~10s to ~1s
       },
     });
 

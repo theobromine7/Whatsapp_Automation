@@ -578,11 +578,10 @@ export default function BusinessDetail() {
   const deleteBusiness = useMutation({
     mutationFn: async () => {
       const token = await auth.currentUser?.getIdToken();
-      const res = await customFetch(`/api/businesses/${businessId}`, {
+      await customFetch(`/api/businesses/${businessId}`, {
         method: "DELETE",
         headers: token ? { Authorization: `Bearer ${token}` } : {},
       });
-      if (!res.ok) throw new Error("Failed to delete business");
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: getListBusinessesQueryKey() });

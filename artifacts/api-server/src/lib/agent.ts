@@ -88,16 +88,18 @@ export async function generateAIResponse(
   const withinHours = isWithinBusinessHours(business.businessHours);
   const systemPrompt = buildSystemPrompt(business, withinHours);
 
-  const recentRows = await db
-    .select()
-    .from(whatsappMessagesTable)
-    .where(eq(whatsappMessagesTable.conversationId, conversationId))
-    .orderBy(desc(whatsappMessagesTable.createdAt))
-    .limit(MAX_HISTORY_MESSAGES);
+  // Fetch history and RAG context in parallel — they're fully independent
+  const [recentRows, { ragContext, topProduct }] = await Promise.all([
+    db
+      .select()
+      .from(whatsappMessagesTable)
+      .where(eq(whatsappMessagesTable.conversationId, conversationId))
+      .orderBy(desc(whatsappMessagesTable.createdAt))
+      .limit(MAX_HISTORY_MESSAGES),
+    retrieveRelevantChunks(business.id, customerMessage),
+  ]);
 
   const history = recentRows.reverse();
-
-  const { ragContext, topProduct } = await retrieveRelevantChunks(business.id, customerMessage);
 
   const fullSystemPrompt = ragContext
     ? `${systemPrompt}\n\n${ragContext}`

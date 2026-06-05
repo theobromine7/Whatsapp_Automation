@@ -11,9 +11,9 @@ const CONFIDENCE_THRESHOLD = 0.80;
 
 const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
 
-/** Typing delay: ~40ms per character, clamped to 1–3 seconds */
+/** Typing delay: ~15ms per character, clamped to 500ms–1.2s for snappy feel */
 function typingDelay(text: string): number {
-  return Math.min(3000, Math.max(1000, text.length * 40));
+  return Math.min(1200, Math.max(500, text.length * 15));
 }
 
 export async function handleIncomingMessage(opts: {

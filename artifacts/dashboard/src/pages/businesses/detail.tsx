@@ -82,6 +82,7 @@ function QRConnectionPanel({ businessId, onConnected }: { businessId: number; on
   const [connectedPhone, setConnectedPhone] = useState<string | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [pairingCode, setPairingCode] = useState<string | null>(null);
+  const [countryCode, setCountryCode] = useState("91");
   const [phoneInput, setPhoneInput] = useState("");
   const eventSourceRef = useRef<EventSource | null>(null);
   const { toast } = useToast();
@@ -170,11 +171,17 @@ function QRConnectionPanel({ businessId, onConnected }: { businessId: number; on
   };
 
   const startPairingSession = async () => {
-    const digits = phoneInput.replace(/\D/g, "");
-    if (digits.length < 7) {
-      setErrorMsg("Enter your full phone number with country code (e.g. 919876543210)");
+    const cc = countryCode.replace(/\D/g, "");
+    const num = phoneInput.replace(/\D/g, "");
+    if (!cc) {
+      setErrorMsg("Enter a country code (e.g. 91 for India)");
       return;
     }
+    if (num.length < 6) {
+      setErrorMsg("Enter a valid phone number");
+      return;
+    }
+    const digits = cc + num;
     setPhase("pairing_wait");
     setPairingCode(null);
     setErrorMsg(null);
@@ -298,19 +305,36 @@ function QRConnectionPanel({ businessId, onConnected }: { businessId: number; on
         <div>
           <p className="font-semibold text-foreground mb-1">Connect with phone number</p>
           <p className="text-sm text-muted-foreground">
-            Enter the WhatsApp number to get an 8-digit pairing code — no QR scan needed.
+            Enter your WhatsApp number to get an 8-digit pairing code — no QR scan needed.
           </p>
         </div>
         <div className="flex gap-2">
+          <div className="flex items-center border rounded-md overflow-hidden focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-0 bg-background shrink-0 w-28">
+            <span className="pl-3 text-muted-foreground text-sm select-none">+</span>
+            <input
+              type="tel"
+              inputMode="numeric"
+              placeholder="91"
+              value={countryCode}
+              onChange={(e) => setCountryCode(e.target.value.replace(/\D/g, "").slice(0, 4))}
+              onKeyDown={(e) => e.key === "Enter" && startPairingSession()}
+              className="w-full px-1.5 py-2 text-sm font-mono bg-transparent outline-none"
+            />
+          </div>
           <Input
-            placeholder="Country code + number (e.g. 919876543210)"
+            type="tel"
+            inputMode="numeric"
+            placeholder="Phone number"
             value={phoneInput}
-            onChange={(e) => setPhoneInput(e.target.value)}
+            onChange={(e) => setPhoneInput(e.target.value.replace(/\D/g, ""))}
             onKeyDown={(e) => e.key === "Enter" && startPairingSession()}
-            className="font-mono"
+            className="font-mono flex-1"
           />
           <Button onClick={startPairingSession} className="shrink-0">Get Code</Button>
         </div>
+        <p className="text-xs text-muted-foreground -mt-2">
+          e.g. country code <span className="font-mono">91</span> + number <span className="font-mono">9876543210</span>
+        </p>
         {errorMsg && <p className="text-sm text-red-600">{errorMsg}</p>}
         <Button variant="ghost" size="sm" onClick={() => { setPhase("idle"); setErrorMsg(null); }} className="text-muted-foreground self-start -mt-1">
           ← Back to QR scan

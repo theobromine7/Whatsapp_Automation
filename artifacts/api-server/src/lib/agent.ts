@@ -21,6 +21,7 @@ export interface AIResponseResult {
   confidence: number;
   purchaseIntent: boolean;
   needsOwner: boolean;
+  skip: boolean;
   detectedProductName?: string;
   detectedProductPrice?: number;
 }
@@ -120,8 +121,16 @@ RESPONSE FORMAT — You MUST respond ONLY with valid JSON matching this schema e
   "intent": "<one-sentence description of what the customer is asking>",
   "confidence": <number 0.0–1.0>,
   "needsOwner": <true or false>,
+  "skip": <true or false>,
   "reply": "<your actual response — plain text only, no markdown, MAXIMUM 20 WORDS>"
 }
+
+skip rules — set skip to true (and leave reply blank) when NO reply is needed:
+- Message is a pure acknowledgement with no question: "ok", "thanks", "noted", "got it", "👍", "seen", "alright"
+- Customer just confirmed they received info and asked nothing new
+- The conversation has naturally ended and nothing was asked
+- You already answered this exact question in the immediately preceding message
+Set skip to false for ALL other cases — including greetings, product questions, complaints, and anything requiring an answer.
 
 Confidence scoring guide:
 - 0.90–1.00: Clear product/price/availability/order question; you have specific knowledge to answer accurately
@@ -215,6 +224,7 @@ function parseStructuredResponse(
   let intent = "general inquiry";
   let confidence = 1.0;
   let needsOwner = false;
+  let skip = false;
   let text = raw;
 
   try {
@@ -223,6 +233,7 @@ function parseStructuredResponse(
       intent?: string;
       confidence?: number;
       needsOwner?: boolean;
+      skip?: boolean;
       reply?: string;
     };
 
@@ -231,8 +242,11 @@ function parseStructuredResponse(
       ? Math.max(0, Math.min(1, parsed.confidence))
       : 1.0;
     needsOwner = parsed.needsOwner === true;
+    skip = parsed.skip === true;
 
-    if (typeof parsed.reply === "string" && parsed.reply.trim()) {
+    if (skip) {
+      text = "";
+    } else if (typeof parsed.reply === "string" && parsed.reply.trim()) {
       text = parsed.reply.trim();
     } else {
       logger.warn({ raw }, "OpenAI JSON missing reply field — using fallback");
@@ -253,6 +267,7 @@ function parseStructuredResponse(
   const msgLower = customerMessage.toLowerCase();
   const purchaseIntent =
     !!upiId &&
+    !skip &&
     PURCHASE_INTENT_KEYWORDS.some((kw) => msgLower.includes(kw));
 
   return {
@@ -261,6 +276,7 @@ function parseStructuredResponse(
     confidence,
     purchaseIntent,
     needsOwner,
+    skip,
     detectedProductName: topProduct?.name,
     detectedProductPrice: topProduct?.price,
   };
@@ -375,7 +391,16 @@ ${business.description ?? ""}
 
 ${business.systemPrompt ?? ""}
 
-CORE RULES — follow these strictly:
+CORE RULES — follow these strictly in order of priority:
+
+PRIORITY 1 — FAQs (highest priority):
+- If the customer's question matches or relates to any FAQ in the FREQUENTLY ASKED QUESTIONS section, answer ONLY from that FAQ. Use it verbatim or paraphrase it naturally. Do NOT add extra information or contradict the FAQ answer.
+- FAQs override everything else — product descriptions, general knowledge, and your own reasoning.
+
+PRIORITY 2 — Product Knowledge Base:
+- For product questions not covered by FAQs, use ONLY the PRODUCT KNOWLEDGE BASE. Never invent prices, stock, or details.
+
+PRIORITY 3 — General Sales Rules:
 - You are a human sales agent, NOT an AI or chatbot. Never say "I'm an AI", "as an AI", or anything that reveals you are automated. If directly asked if you are a bot or AI, deflect naturally — e.g. "I'm here to help you, what are you looking for?" — and move on.
 - You are a SALES AGENT. Stay focused on products, pricing, availability, orders, and delivery. Do not engage in general or off-topic chat.
 - REPLY LENGTH: Keep every reply under 20 words. Be direct, short, and conversational (WhatsApp style). No bullet points, no markdown, plain text only.
@@ -383,7 +408,8 @@ CORE RULES — follow these strictly:
 - If a product, category, or item is not available or not in your catalog, tell the customer directly and clearly — e.g. "Sorry, we don't carry that." Then offer the closest alternative if one exists.
 - ONLY share product links or URLs that appear verbatim in the PRODUCT KNOWLEDGE BASE. Do not construct or guess URLs.
 - When a customer asks for multiple product links, or wants to browse all/many products, do NOT list individual links. Instead, send them the store link to browse everything.
-- Always push the conversation toward a purchase or capture what the customer needs.${noContextWarning}${hoursNote}${
+- Always push the conversation toward a purchase or capture what the customer needs.
+- DO NOT reply when no reply is needed — set skip: true for pure acknowledgements like "ok", "thanks", "noted", "👍", "seen".${noContextWarning}${hoursNote}${
   business.storeSlug
     ? `\n- When a customer asks to browse all products, share: https://store.advize.in/store/${business.storeSlug}`
     : ""

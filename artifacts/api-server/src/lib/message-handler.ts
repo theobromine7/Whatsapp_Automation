@@ -153,9 +153,18 @@ export async function handleIncomingMessage(opts: {
   }
 
   logger.info(
-    { businessId: business.id, conversationId: conversation.id, intent: aiResult.intent, confidence: aiResult.confidence },
+    { businessId: business.id, conversationId: conversation.id, intent: aiResult.intent, confidence: aiResult.confidence, skip: aiResult.skip },
     "AI response generated"
   );
+
+  // ── Skip — AI decided no reply is needed ─────────────────────────────────
+  if (aiResult.skip) {
+    logger.info(
+      { businessId: business.id, conversationId: conversation.id, intent: aiResult.intent },
+      "AI skip=true — no reply sent"
+    );
+    return;
+  }
 
   // ── Owner Escalation — AI explicitly flagged needsOwner ──────────────────
   if (aiResult.needsOwner) {

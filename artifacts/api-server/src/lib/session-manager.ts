@@ -66,15 +66,20 @@ async function closeSocketOnly(businessId: number): Promise<void> {
   const entry = sessions.get(businessId);
   if (!entry) return;
 
+  // Delete from the map FIRST — before calling end() — so that any
+  // synchronous connection.update events fired by end() fail the guard
+  // check (sessions.get(businessId) !== entry) and are safely ignored.
+  // If we deleted after, a 401 from closing mid-pairing would pass the
+  // guard and wipe session credential files.
+  sessions.delete(businessId);
+
   // End the websocket without sending a logout to WhatsApp.
-  // Using end() avoids the loggedOut=true connection.update event
-  // that would otherwise delete session credentials.
   try {
     (entry.socket as { end?: (err?: Error) => void })?.end?.();
   } catch { /* ignore */ }
 
-  // Don't close SSE clients — they stay open for the new session's events
-  sessions.delete(businessId);
+  // Note: SSE clients are intentionally kept — they stay registered on
+  // the new entry created by the caller (startSession preserves the set).
 }
 
 export async function startSession(businessId: number, pairingPhone?: string): Promise<void> {

@@ -12,6 +12,9 @@ description: Why QR/pairing connections failed immediately and how the session m
 - `closeSocketOnly(businessId)` — ends the WS (no logout), deletes in-memory entry, preserves session files. Used by `startSession()` at the top.
 - `stopSession(businessId)` — calls `logout()` + deletes session files + closes SSE clients. Used ONLY by user-initiated disconnect routes.
 
+## Critical ordering in closeSocketOnly
+`sessions.delete(businessId)` MUST be called BEFORE `sock.end()`. Calling `end()` on a mid-pairing socket fires a synchronous `connection.update` with `loggedOut=true` (WhatsApp 401 for incomplete pairing). If the entry is still in the map when this fires, the guard check passes and session files get deleted. Delete first, then end.
+
 ## Error 515 (restartRequired)
 WhatsApp sends stream error code 515 to tell the client to reconnect — it is NOT a credential failure and must NOT count toward `connectAttempts`. Treat it the same as a dropped live session: reconnect after a short delay, keep credentials intact.
 

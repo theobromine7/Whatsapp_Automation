@@ -56,18 +56,45 @@ function broadcastToSSE(businessId: number, data: Record<string, unknown>): void
   }
 }
 
+/**
+ * Close an existing socket WITHOUT logging out or deleting session files.
+ * Used internally when we want to restart/replace a session.
+ * Only use stopSession() for user-initiated disconnects.
+ */
+async function closeSocketOnly(businessId: number): Promise<void> {
+  clearRestartTimer(businessId);
+  const entry = sessions.get(businessId);
+  if (!entry) return;
+
+  // End the websocket without sending a logout to WhatsApp.
+  // Using end() avoids the loggedOut=true connection.update event
+  // that would otherwise delete session credentials.
+  try {
+    (entry.socket as { end?: (err?: Error) => void })?.end?.();
+  } catch { /* ignore */ }
+
+  // Don't close SSE clients — they stay open for the new session's events
+  sessions.delete(businessId);
+}
+
 export async function startSession(businessId: number, pairingPhone?: string): Promise<void> {
   clearRestartTimer(businessId);
-  await stopSession(businessId);
 
+  // Grab SSE clients and attempt count from the existing entry BEFORE closing it
   const existing = sessions.get(businessId);
+  const sseClients = existing?.sseClients ?? new Set<Response>();
+  const connectAttempts = (existing?.connectAttempts ?? 0) + 1;
+
+  // Close the old socket without logging out (preserves session files + creds)
+  await closeSocketOnly(businessId);
+
   const entry: SessionEntry = {
     socket: null,
-    sseClients: existing?.sseClients ?? new Set(),
+    sseClients,
     status: "connecting",
     qrDataUrl: null,
     connectedPhone: null,
-    connectAttempts: (existing?.connectAttempts ?? 0) + 1,
+    connectAttempts,
   };
   sessions.set(businessId, entry);
 
@@ -125,6 +152,9 @@ export async function startSession(businessId: number, pairingPhone?: string): P
   }
 
   sock.ev.on("connection.update", async (update) => {
+    // Guard: ignore stale events from sockets that have been replaced by a newer startSession call
+    if (sessions.get(businessId) !== entry) return;
+
     const { connection, lastDisconnect, qr } = update;
 
     // In pairing-code mode skip QR generation
@@ -142,11 +172,15 @@ export async function startSession(businessId: number, pairingPhone?: string): P
     if (connection === "close") {
       const statusCode = (lastDisconnect?.error as { output?: { statusCode?: number } })?.output?.statusCode;
       const loggedOut = statusCode === baileys.DisconnectReason.loggedOut;
+      const isBadSession = statusCode === baileys.DisconnectReason.badSession;
+      // 515 = WhatsApp telling client to restart — NOT a logout, NOT a credential problem
+      const isRestartRequired = statusCode === (baileys.DisconnectReason as Record<string, number>).restartRequired || statusCode === 515;
       const wasConnected = entry.status === "connected";
 
-      logger.info({ businessId, loggedOut }, "WhatsApp session closed");
+      logger.info({ businessId, statusCode, loggedOut, wasConnected, isRestartRequired }, "WhatsApp session closed");
 
-      if (loggedOut) {
+      if (loggedOut || isBadSession) {
+        // Genuine auth failure — wipe credentials and stop
         const dir = getSessionDir(businessId);
         fs.rmSync(dir, { recursive: true, force: true });
         entry.status = "disconnected";
@@ -156,20 +190,29 @@ export async function startSession(businessId: number, pairingPhone?: string): P
           .where(eq(businessesTable.id, businessId));
         broadcastToSSE(businessId, { type: "disconnected", reason: "logged_out" });
         sessions.delete(businessId);
-      } else if (wasConnected) {
-        // Session was live — auto-reconnect to restore service
+
+      } else if (wasConnected || isRestartRequired) {
+        // Live session dropped OR WA requested a restart (error 515) — reconnect, keep credentials
         entry.status = "disconnected";
         await db
           .update(businessesTable)
           .set({ sessionStatus: "disconnected", updatedAt: new Date() })
           .where(eq(businessesTable.id, businessId));
         broadcastToSSE(businessId, { type: "reconnecting" });
-        const timer = setTimeout(() => startSession(businessId), 5000);
+        const delay = wasConnected ? 5000 : 2000;
+        const timer = setTimeout(() => startSession(businessId), delay);
         restartTimers.set(businessId, timer);
+
       } else {
-        // Was still in QR-scan phase
+        // Transient failure during QR/pairing phase (timeout, network blip, etc.)
+        // Only count REAL auth failures (bad creds), not transient drops
+        const isAuthFailure = statusCode === 403 || statusCode === 400;
+        if (isAuthFailure) {
+          entry.connectAttempts += 1;
+        }
+
         if (entry.connectAttempts >= 5) {
-          // Too many failed attempts — stale credentials. Clear them and stop.
+          // Stale credentials from a previous account — wipe and stop
           const dir = getSessionDir(businessId);
           fs.rmSync(dir, { recursive: true, force: true });
           entry.status = "disconnected";
@@ -179,9 +222,9 @@ export async function startSession(businessId: number, pairingPhone?: string): P
             .where(eq(businessesTable.id, businessId));
           broadcastToSSE(businessId, { type: "disconnected", reason: "auth_failed" });
           sessions.delete(businessId);
-          logger.warn({ businessId }, "QR session failed too many times — cleared stale credentials");
+          logger.warn({ businessId }, "QR session hit auth failure limit — cleared stale credentials");
         } else {
-          // Retry so the QR panel can pick up a fresh QR code
+          // Retry — grab a fresh QR or wait for the user to re-enter pairing code
           entry.status = "connecting";
           entry.qrDataUrl = null;
           broadcastToSSE(businessId, { type: "reconnecting" });

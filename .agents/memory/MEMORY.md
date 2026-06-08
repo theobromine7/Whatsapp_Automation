@@ -1,1 +1,2 @@
 - [Firebase auth bypass pattern](firebase-auth-bypass.md) — dev bypass in auth-middleware.ts + AuthContext.tsx; real auth re-enables by setting two secrets, zero code changes.
+- [Baileys session restart bug](baileys-session-restart.md) — startSession must NOT call logout(); use closeSocketOnly() instead; error 515 = restartRequired, not a credential failure.

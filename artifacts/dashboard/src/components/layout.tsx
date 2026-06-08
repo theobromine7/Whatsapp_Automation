@@ -119,9 +119,9 @@ export function Layout({ children }: { children: React.ReactNode }) {
         {children}
       </div>
 
-      {/* Mobile bottom nav bar */}
+      {/* Mobile bottom nav bar — Dashboard & Pricing hidden here, accessible via Settings */}
       <nav className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-[#1f2c34] flex items-center justify-around px-1 pt-2 pb-[max(8px,env(safe-area-inset-bottom))]">
-        {NAV.map(({ href, icon: Icon, label }) => (
+        {NAV.filter(({ href }) => href !== "/dashboard" && href !== "/pricing").map(({ href, icon: Icon, label }) => (
           <Link key={href} href={href}>
             <div className={cn(
               "flex flex-col items-center gap-0.5 px-3 py-1 rounded-xl transition-all",

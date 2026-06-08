@@ -14,6 +14,8 @@ import {
   AlertTriangle,
   ChevronRight,
   Mail,
+  LayoutDashboard,
+  Crown,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -107,6 +109,36 @@ export default function Settings() {
               )}
             </div>
           </div>
+        </CardContent>
+      </Card>
+
+      {/* More — mobile-only shortcut to nav items hidden from bottom bar */}
+      <Card className="md:hidden">
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base flex items-center gap-2">
+            <LayoutDashboard className="w-4 h-4 text-primary" />
+            More
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="p-0">
+          <Link href="/dashboard">
+            <div className="flex items-center justify-between px-6 py-3.5 hover:bg-muted/50 cursor-pointer transition-colors border-b">
+              <div className="flex items-center gap-3">
+                <LayoutDashboard className="w-4 h-4 text-muted-foreground" />
+                <p className="text-sm font-medium">Dashboard</p>
+              </div>
+              <ChevronRight className="w-4 h-4 text-muted-foreground" />
+            </div>
+          </Link>
+          <Link href="/pricing">
+            <div className="flex items-center justify-between px-6 py-3.5 hover:bg-muted/50 cursor-pointer transition-colors">
+              <div className="flex items-center gap-3">
+                <Crown className="w-4 h-4 text-muted-foreground" />
+                <p className="text-sm font-medium">Pricing &amp; Plans</p>
+              </div>
+              <ChevronRight className="w-4 h-4 text-muted-foreground" />
+            </div>
+          </Link>
         </CardContent>
       </Card>
 

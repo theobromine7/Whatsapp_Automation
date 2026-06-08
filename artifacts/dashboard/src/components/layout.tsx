@@ -15,7 +15,7 @@ import { logout } from "@/lib/firebase";
 import { useQueryClient } from "@tanstack/react-query";
 
 const NAV = [
-  { href: "/inbox", icon: MessageSquare, label: "Inbox" },
+  { href: "/inbox", icon: MessageSquare, label: "Wapp" },
   { href: "/dashboard", icon: LayoutDashboard, label: "Dashboard" },
   { href: "/businesses", icon: Building2, label: "Businesses" },
   { href: "/businesses/new", icon: PlusCircle, label: "Add" },

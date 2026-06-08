@@ -56,7 +56,7 @@ function broadcastToSSE(businessId: number, data: Record<string, unknown>): void
   }
 }
 
-export async function startSession(businessId: number): Promise<void> {
+export async function startSession(businessId: number, pairingPhone?: string): Promise<void> {
   clearRestartTimer(businessId);
   await stopSession(businessId);
 
@@ -87,6 +87,8 @@ export async function startSession(businessId: number): Promise<void> {
     version,
     auth: state,
     printQRInTerminal: false,
+    // For pairing-code flow, suppress QR generation entirely
+    ...(pairingPhone ? { generateHighQualityLinkPreview: false } : {}),
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     logger: {
       level: "warn",
@@ -106,10 +108,27 @@ export async function startSession(businessId: number): Promise<void> {
 
   entry.socket = sock;
 
+  // Pairing-code flow: after the socket connects to WA servers (~2s), request the code
+  if (pairingPhone && !state.creds.registered) {
+    setTimeout(async () => {
+      try {
+        const code: string = await (sock as any).requestPairingCode(pairingPhone);
+        // Format as XXXX-XXXX for readability
+        const formatted = code.length === 8 ? `${code.slice(0, 4)}-${code.slice(4)}` : code;
+        broadcastToSSE(businessId, { type: "pairing_code", code: formatted });
+        logger.info({ businessId, pairingPhone }, "Pairing code issued");
+      } catch (err) {
+        logger.error({ err, businessId }, "requestPairingCode failed");
+        broadcastToSSE(businessId, { type: "pairing_error", message: "Could not generate code. Check phone number and try again." });
+      }
+    }, 3000); // give Baileys time to connect to WA servers before requesting
+  }
+
   sock.ev.on("connection.update", async (update) => {
     const { connection, lastDisconnect, qr } = update;
 
-    if (qr) {
+    // In pairing-code mode skip QR generation
+    if (qr && !pairingPhone) {
       try {
         const qrDataUrl = await QRCode.default.toDataURL(qr, { width: 300, margin: 2 });
         entry.qrDataUrl = qrDataUrl;

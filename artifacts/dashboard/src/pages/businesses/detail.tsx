@@ -49,6 +49,7 @@ import { FirebaseSyncTab } from "./firebase-sync-tab";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
+import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { cn } from "@/lib/utils";
@@ -71,13 +72,17 @@ type StreamEvent =
   | { type: "qr"; qrDataUrl: string }
   | { type: "connected"; phone: string }
   | { type: "reconnecting" }
-  | { type: "disconnected"; reason?: string };
+  | { type: "disconnected"; reason?: string }
+  | { type: "pairing_code"; code: string }
+  | { type: "pairing_error"; message: string };
 
 function QRConnectionPanel({ businessId, onConnected }: { businessId: number; onConnected: () => void }) {
-  const [phase, setPhase] = useState<"idle" | "starting" | "qr" | "connected" | "error">("idle");
+  const [phase, setPhase] = useState<"idle" | "starting" | "qr" | "connected" | "error" | "pairing_input" | "pairing_wait" | "pairing_code">("idle");
   const [qrDataUrl, setQrDataUrl] = useState<string | null>(null);
   const [connectedPhone, setConnectedPhone] = useState<string | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [pairingCode, setPairingCode] = useState<string | null>(null);
+  const [phoneInput, setPhoneInput] = useState("");
   const eventSourceRef = useRef<EventSource | null>(null);
   const { toast } = useToast();
 
@@ -104,6 +109,12 @@ function QRConnectionPanel({ businessId, onConnected }: { businessId: number; on
           es.close();
           toast({ title: "WhatsApp connected!", description: `+${data.phone} is now live.` });
           onConnected();
+        } else if (data.type === "pairing_code") {
+          setPairingCode(data.code);
+          setPhase("pairing_code");
+        } else if (data.type === "pairing_error") {
+          setPhase("pairing_input");
+          setErrorMsg(data.message);
         } else if (data.type === "reconnecting") {
           // Session is retrying — stay in starting phase, keep stream open for next QR
           setPhase("starting");
@@ -156,6 +167,28 @@ function QRConnectionPanel({ businessId, onConnected }: { businessId: number; on
     setQrDataUrl(null);
     setConnectedPhone(null);
     onConnected();
+  };
+
+  const startPairingSession = async () => {
+    const digits = phoneInput.replace(/\D/g, "");
+    if (digits.length < 7) {
+      setErrorMsg("Enter your full phone number with country code (e.g. 919876543210)");
+      return;
+    }
+    setPhase("pairing_wait");
+    setPairingCode(null);
+    setErrorMsg(null);
+    try {
+      await customFetch(`/api/sessions/${businessId}/pairing-code`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ phone: digits }),
+      });
+      openStream(businessId);
+    } catch {
+      setPhase("pairing_input");
+      setErrorMsg("Could not start session. Check server logs.");
+    }
   };
 
   useEffect(() => {
@@ -224,6 +257,68 @@ function QRConnectionPanel({ businessId, onConnected }: { businessId: number; on
     );
   }
 
+  if (phase === "pairing_wait") {
+    return (
+      <div className="flex flex-col items-center gap-4 py-8">
+        <Loader2 className="w-8 h-8 animate-spin text-primary" />
+        <p className="text-sm text-muted-foreground">Generating your pairing code...</p>
+        <p className="text-xs text-muted-foreground">This takes about 5 seconds</p>
+      </div>
+    );
+  }
+
+  if (phase === "pairing_code" && pairingCode) {
+    return (
+      <div className="flex flex-col items-center gap-6 py-6">
+        <div className="text-center">
+          <p className="font-semibold text-foreground mb-1">Enter this code in WhatsApp</p>
+          <p className="text-sm text-muted-foreground max-w-xs">
+            Open WhatsApp → Settings → Linked Devices → Link a Device → Link with Phone Number
+          </p>
+        </div>
+        <div className="px-8 py-5 bg-primary/5 border-2 border-primary/20 rounded-2xl text-center">
+          <p className="text-xs text-muted-foreground mb-2 font-medium uppercase tracking-wider">Pairing Code</p>
+          <p className="text-4xl font-bold font-mono tracking-widest text-primary">{pairingCode}</p>
+          <p className="text-xs text-muted-foreground mt-2">Valid for a few minutes</p>
+        </div>
+        <div className="flex items-center gap-2 text-sm text-muted-foreground animate-pulse">
+          <Loader2 className="w-4 h-4 animate-spin" />
+          Waiting for you to enter the code...
+        </div>
+        <Button variant="ghost" size="sm" onClick={() => { setPhase("pairing_input"); setPairingCode(null); }} className="text-muted-foreground">
+          <RefreshCw className="w-3.5 h-3.5 mr-1.5" /> Try again
+        </Button>
+      </div>
+    );
+  }
+
+  if (phase === "pairing_input") {
+    return (
+      <div className="flex flex-col gap-4 py-4">
+        <div>
+          <p className="font-semibold text-foreground mb-1">Connect with phone number</p>
+          <p className="text-sm text-muted-foreground">
+            Enter the WhatsApp number to get an 8-digit pairing code — no QR scan needed.
+          </p>
+        </div>
+        <div className="flex gap-2">
+          <Input
+            placeholder="Country code + number (e.g. 919876543210)"
+            value={phoneInput}
+            onChange={(e) => setPhoneInput(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && startPairingSession()}
+            className="font-mono"
+          />
+          <Button onClick={startPairingSession} className="shrink-0">Get Code</Button>
+        </div>
+        {errorMsg && <p className="text-sm text-red-600">{errorMsg}</p>}
+        <Button variant="ghost" size="sm" onClick={() => { setPhase("idle"); setErrorMsg(null); }} className="text-muted-foreground self-start -mt-1">
+          ← Back to QR scan
+        </Button>
+      </div>
+    );
+  }
+
   return (
     <div className="flex flex-col items-center gap-5 py-6">
       <div className="w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center">
@@ -241,6 +336,15 @@ function QRConnectionPanel({ businessId, onConnected }: { businessId: number; on
       <Button onClick={startSession} className="gap-2" data-testid="button-generate-qr">
         <MessageCircle className="w-4 h-4" />
         Generate QR Code
+      </Button>
+      <div className="flex items-center gap-3 w-full max-w-xs">
+        <div className="flex-1 h-px bg-border" />
+        <span className="text-xs text-muted-foreground">or</span>
+        <div className="flex-1 h-px bg-border" />
+      </div>
+      <Button variant="outline" onClick={() => { setPhase("pairing_input"); setErrorMsg(null); }} className="gap-2 text-sm">
+        <Smartphone className="w-4 h-4" />
+        Connect with phone number
       </Button>
     </div>
   );

@@ -68,6 +68,22 @@ router.get("/sessions/:businessId/status", requireAuth, async (req, res): Promis
   });
 });
 
+router.post("/sessions/:businessId/pairing-code", requireAuth, async (req, res): Promise<void> => {
+  const businessId = parseBusinessId(req.params.businessId!);
+  const business = await getOwnedBusiness(businessId, req.user!.uid);
+  if (!business) { res.status(404).json({ error: "Business not found" }); return; }
+
+  const rawPhone = (req.body as { phone?: string }).phone ?? "";
+  const phone = rawPhone.replace(/\D/g, ""); // digits only, e.g. "919876543210"
+  if (!phone || phone.length < 7) { res.status(400).json({ error: "Valid phone number required (with country code)" }); return; }
+
+  startSession(businessId, phone).catch((err) => {
+    req.log.error({ err, businessId }, "Pairing session start failed");
+  });
+
+  res.json({ businessId, status: "starting" });
+});
+
 router.post("/sessions/:businessId/disconnect", requireAuth, async (req, res): Promise<void> => {
   const businessId = parseBusinessId(req.params.businessId!);
   const business = await getOwnedBusiness(businessId, req.user!.uid);

@@ -1,8 +1,13 @@
-import { ai, embedText } from "@workspace/integrations-gemini-ai";
+import OpenAI from "openai";
 import { db, whatsappMessagesTable, knowledgeChunksTable } from "@workspace/db";
 import { eq, sql, desc } from "drizzle-orm";
 import { logger } from "./logger";
 import type { Business } from "@workspace/db";
+
+const openai = new OpenAI({
+  apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY,
+  baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL,
+});
 
 const PURCHASE_INTENT_KEYWORDS = [
   "buy", "purchase", "order", "payment", "pay", "how much", "price", "cost",
@@ -31,7 +36,7 @@ interface BusinessHours {
 }
 
 export function isWithinBusinessHours(businessHoursJson: string | null | undefined): boolean {
-  if (!businessHoursJson) return true; // Not configured → always open
+  if (!businessHoursJson) return true;
 
   let hours: BusinessHours;
   try {
@@ -88,7 +93,6 @@ export async function generateAIResponse(
   const withinHours = isWithinBusinessHours(business.businessHours);
   const systemPrompt = buildSystemPrompt(business, withinHours);
 
-  // Fetch history and RAG context in parallel — they're fully independent
   const [recentRows, { ragContext, topProduct }] = await Promise.all([
     db
       .select()
@@ -109,7 +113,6 @@ export async function generateAIResponse(
     ? `\n\nPAYMENT: If a customer wants to buy something, tell them you will send a payment QR code. UPI ID: ${business.upiId}`
     : "";
 
-  // JSON response format instruction — must be last in the system instruction
   const jsonFormatInstruction = `
 
 RESPONSE FORMAT — You MUST respond ONLY with valid JSON matching this schema exactly:
@@ -137,48 +140,45 @@ Set needsOwner to false for all normal product, price, availability, or FAQ ques
 
   const systemInstruction = fullSystemPrompt + paymentPrompt + jsonFormatInstruction;
 
-  const buildContents = (msgs: typeof history) => {
-    const contents = msgs.map((msg) => ({
-      role: msg.role === "assistant" ? "model" as const : "user" as const,
-      parts: [{ text: msg.content }],
-    }));
-    contents.push({ role: "user", parts: [{ text: customerMessage }] });
-    return contents;
+  const buildMessages = (msgs: typeof history): OpenAI.Chat.ChatCompletionMessageParam[] => {
+    const result: OpenAI.Chat.ChatCompletionMessageParam[] = [
+      { role: "system", content: systemInstruction },
+      ...msgs.map((msg) => ({
+        role: (msg.role === "assistant" ? "assistant" : "user") as "assistant" | "user",
+        content: msg.content,
+      })),
+      { role: "user", content: customerMessage },
+    ];
+    return result;
   };
 
-  const callGemini = async (msgs: typeof history): Promise<AIResponseResult> => {
-    const response = await ai.models.generateContent({
-      model: "gemini-2.5-flash",
-      contents: buildContents(msgs),
-      config: {
-        systemInstruction,
-        maxOutputTokens: 300,
-        responseMimeType: "application/json",
-        thinkingConfig: { thinkingBudget: 0 }, // disable thinking — reduces latency from ~10s to ~1s
-      },
+  const callOpenAI = async (msgs: typeof history): Promise<AIResponseResult> => {
+    const response = await openai.chat.completions.create({
+      model: "gpt-4o-mini",
+      messages: buildMessages(msgs),
+      max_tokens: 300,
+      response_format: { type: "json_object" },
     });
 
-    const raw = (response.text ?? "").trim();
+    const raw = (response.choices[0]?.message?.content ?? "").trim();
     return parseStructuredResponse(raw, customerMessage, business.upiId, topProduct);
   };
 
   const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
   try {
-    const result = await callGemini(history);
-    return result;
+    return await callOpenAI(history);
   } catch (error) {
-    // Retry once on transient 503 (model overloaded) before giving up
-    const is503 =
+    const is429 =
       error instanceof Error &&
-      (error.message.includes("503") || error.message.includes("UNAVAILABLE") || error.message.includes("high demand"));
-    if (is503) {
-      logger.warn({ businessId: business.id }, "Gemini 503 — retrying in 2s");
+      (error.message.includes("429") || error.message.includes("rate_limit") || error.message.includes("Rate limit"));
+    if (is429) {
+      logger.warn({ businessId: business.id }, "OpenAI 429 rate limit — retrying in 2s");
       await sleep(2000);
       try {
-        return await callGemini(history);
+        return await callOpenAI(history);
       } catch (retryError) {
-        logger.error({ retryError, businessId: business.id }, "Gemini 503 retry also failed");
+        logger.error({ retryError, businessId: business.id }, "OpenAI 429 retry also failed");
         throw retryError;
       }
     }
@@ -189,20 +189,19 @@ Set needsOwner to false for all normal product, price, availability, or FAQ ques
         error.message.includes("context") ||
         error.message.includes("limit") ||
         error.message.includes("too long") ||
-        error.message.includes("400") ||
-        error.message.includes("429"));
+        error.message.includes("400"));
 
     if (isContextError && history.length > RETRY_HISTORY_MESSAGES) {
       logger.warn({ businessId: business.id, historyLen: history.length }, "Context too long — retrying with shorter history");
       try {
-        return await callGemini(history.slice(-RETRY_HISTORY_MESSAGES));
+        return await callOpenAI(history.slice(-RETRY_HISTORY_MESSAGES));
       } catch (retryError) {
-        logger.error({ retryError, businessId: business.id }, "Gemini retry also failed");
+        logger.error({ retryError, businessId: business.id }, "OpenAI retry also failed");
         throw retryError;
       }
     }
 
-    logger.error({ error, businessId: business.id }, "Gemini API error");
+    logger.error({ error, businessId: business.id }, "OpenAI API error");
     throw error;
   }
 }
@@ -219,7 +218,6 @@ function parseStructuredResponse(
   let text = raw;
 
   try {
-    // Strip markdown code fences if present
     const cleaned = raw.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/, "").trim();
     const parsed = JSON.parse(cleaned) as {
       intent?: string;
@@ -237,19 +235,16 @@ function parseStructuredResponse(
     if (typeof parsed.reply === "string" && parsed.reply.trim()) {
       text = parsed.reply.trim();
     } else {
-      // reply field missing or empty — log and use safe fallback
-      logger.warn({ raw }, "Gemini JSON missing reply field — using fallback");
+      logger.warn({ raw }, "OpenAI JSON missing reply field — using fallback");
       text = "How can I help you?";
     }
   } catch {
-    // Gemini returned plain text instead of JSON — use it directly if it looks
-    // like a real sentence, otherwise fall back to a safe default
     const looksLikeJson = raw.trim().startsWith("{") || raw.trim().startsWith("[");
     if (!looksLikeJson && raw.trim().length > 0) {
       text = raw.trim();
       confidence = 0.9;
     } else {
-      logger.warn({ raw }, "Gemini returned unparseable response — using fallback");
+      logger.warn({ raw }, "OpenAI returned unparseable response — using fallback");
       text = "How can I help you?";
       confidence = 0.5;
     }
@@ -276,6 +271,14 @@ function parseStructuredResponse(
 interface TopProduct {
   name: string;
   price: number;
+}
+
+async function embedText(text: string): Promise<number[]> {
+  const response = await openai.embeddings.create({
+    model: "text-embedding-3-small",
+    input: text,
+  });
+  return response.data[0]!.embedding;
 }
 
 async function retrieveRelevantChunks(

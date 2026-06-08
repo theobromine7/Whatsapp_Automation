@@ -1,10 +1,23 @@
 import { Router, type IRouter } from "express";
 import { eq, and } from "drizzle-orm";
 import { db, businessesTable, knowledgeChunksTable } from "@workspace/db";
-import { embedText } from "@workspace/integrations-gemini-ai";
+import OpenAI from "openai";
 import { fetchStoreByOwner, fetchProductsByStoreId } from "../lib/firebase";
 import { logger } from "../lib/logger";
 import { requireAuth } from "../lib/auth-middleware";
+
+const openai = new OpenAI({
+  apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY,
+  baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL,
+});
+
+async function embedText(text: string): Promise<number[]> {
+  const response = await openai.embeddings.create({
+    model: "text-embedding-3-small",
+    input: text,
+  });
+  return response.data[0]!.embedding;
+}
 
 const router: IRouter = Router();
 

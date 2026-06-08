@@ -1,6 +1,11 @@
-import { ai } from "@workspace/integrations-gemini-ai";
+import OpenAI from "openai";
 import { logger } from "./logger";
 import type { ContactType, AiState } from "@workspace/db";
+
+const openai = new OpenAI({
+  apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY,
+  baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL,
+});
 
 const VALID_TYPES: ContactType[] = [
   "SALES_LEAD",
@@ -41,13 +46,14 @@ Message: "${messageText.slice(0, 300)}"
 Category:`;
 
   try {
-    const response = await ai.models.generateContent({
-      model: "gemini-2.5-flash",
-      contents: [{ role: "user", parts: [{ text: prompt }] }],
-      config: { maxOutputTokens: 20, temperature: 0 },
+    const response = await openai.chat.completions.create({
+      model: "gpt-4o-mini",
+      messages: [{ role: "user", content: prompt }],
+      max_tokens: 20,
+      temperature: 0,
     });
 
-    const raw = (response.text ?? "").trim().toUpperCase() as ContactType;
+    const raw = (response.choices[0]?.message?.content ?? "").trim().toUpperCase() as ContactType;
     if (VALID_TYPES.includes(raw)) return raw;
 
     logger.warn({ raw, message: messageText }, "Lead classifier returned unexpected value, defaulting to UNKNOWN");

@@ -206,17 +206,17 @@ function QRConnectionPanel({ businessId, onConnected }: { businessId: number; on
 
   if (phase === "connected" || connectedPhone) {
     return (
-      <div className="flex items-center justify-between p-4 bg-green-50 border border-green-200 rounded-xl">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-full bg-green-100 flex items-center justify-center">
+      <div className="flex flex-col sm:flex-row sm:items-center gap-3 p-4 bg-green-50 border border-green-200 rounded-xl">
+        <div className="flex items-center gap-3 flex-1 min-w-0">
+          <div className="w-10 h-10 rounded-full bg-green-100 flex items-center justify-center shrink-0">
             <Wifi className="w-5 h-5 text-green-600" />
           </div>
-          <div>
+          <div className="min-w-0">
             <p className="font-semibold text-green-900">WhatsApp Connected</p>
-            <p className="text-sm text-green-700 font-mono">+{connectedPhone}</p>
+            <p className="text-sm text-green-700 font-mono truncate">+{connectedPhone}</p>
           </div>
         </div>
-        <Button variant="outline" size="sm" className="text-red-600 border-red-200 hover:bg-red-50" onClick={disconnect}>
+        <Button variant="outline" size="sm" className="text-red-600 border-red-200 hover:bg-red-50 w-full sm:w-auto" onClick={disconnect}>
           <WifiOff className="w-4 h-4 mr-1.5" /> Disconnect
         </Button>
       </div>
@@ -225,18 +225,18 @@ function QRConnectionPanel({ businessId, onConnected }: { businessId: number; on
 
   if (phase === "qr" && qrDataUrl) {
     return (
-      <div className="flex flex-col items-center gap-6 py-6">
-        <div>
-          <p className="text-center font-semibold text-foreground mb-1">Scan with WhatsApp</p>
-          <p className="text-center text-sm text-muted-foreground">
-            Open WhatsApp on your phone → tap the three-dot menu → Linked Devices → Link a Device
+      <div className="flex flex-col items-center gap-5 py-4">
+        <div className="text-center px-2">
+          <p className="font-semibold text-foreground mb-1">Scan with WhatsApp</p>
+          <p className="text-sm text-muted-foreground leading-relaxed">
+            Open WhatsApp → three-dot menu → Linked Devices → Link a Device
           </p>
         </div>
-        <div className="relative">
+        <div className="relative w-full max-w-[224px]">
           <img
             src={qrDataUrl}
             alt="WhatsApp QR code"
-            className="w-56 h-56 rounded-xl border-4 border-primary/20 shadow-lg"
+            className="w-full aspect-square rounded-xl border-4 border-primary/20 shadow-lg"
           />
           <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
             <div className="w-12 h-12 bg-white rounded-lg flex items-center justify-center shadow">
@@ -468,13 +468,15 @@ function MetaConnectionPanel({ business, onSaved }: {
   if (isConnected && !editing) {
     return (
       <div className="space-y-4">
-        <div className="flex items-center gap-3 p-3 bg-blue-50 border border-blue-200 rounded-lg">
-          <CheckCircle2 className="w-5 h-5 text-blue-600 shrink-0" />
-          <div className="flex-1 min-w-0">
-            <p className="text-sm font-medium text-blue-900">Meta Cloud API Connected</p>
-            <p className="text-xs text-blue-700 font-mono truncate">{business.whatsappPhoneNumber ?? business.whatsappPhoneNumberId}</p>
+        <div className="flex flex-col sm:flex-row sm:items-center gap-3 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+          <div className="flex items-center gap-3 flex-1 min-w-0">
+            <CheckCircle2 className="w-5 h-5 text-blue-600 shrink-0" />
+            <div className="min-w-0">
+              <p className="text-sm font-medium text-blue-900">Meta Cloud API Connected</p>
+              <p className="text-xs text-blue-700 font-mono truncate">{business.whatsappPhoneNumber ?? business.whatsappPhoneNumberId}</p>
+            </div>
           </div>
-          <Button variant="ghost" size="sm" className="text-blue-700 hover:text-blue-900 shrink-0" onClick={() => setEditing(true)}>
+          <Button variant="ghost" size="sm" className="text-blue-700 hover:text-blue-900 w-full sm:w-auto" onClick={() => setEditing(true)}>
             <Pencil className="w-3.5 h-3.5 mr-1" /> Edit
           </Button>
         </div>
@@ -871,23 +873,23 @@ export default function BusinessDetail() {
       <Tabs defaultValue={isConnected ? "conversations" : "connect"} className="w-full">
         <div className="overflow-x-auto -mx-1 px-1 pb-1">
           <TabsList className="flex w-max md:grid md:w-full md:grid-cols-6 md:max-w-3xl gap-0">
-            <TabsTrigger value="connect" className="gap-1 text-xs md:text-sm px-2 md:px-3">
-              <Link2 className="w-3 h-3 md:w-3.5 md:h-3.5" /> Connect
+            <TabsTrigger value="connect" className="gap-1 text-xs md:text-sm px-2.5 md:px-3">
+              <Link2 className="w-3.5 h-3.5 shrink-0" /> <span className="hidden xs:inline">Connect</span><span className="xs:hidden">Link</span>
             </TabsTrigger>
-            <TabsTrigger value="conversations" className="gap-1 text-xs md:text-sm px-2 md:px-3">
-              <MessageSquare className="w-3 h-3 md:w-3.5 md:h-3.5" /> Chats
+            <TabsTrigger value="conversations" className="gap-1 text-xs md:text-sm px-2.5 md:px-3">
+              <MessageSquare className="w-3.5 h-3.5 shrink-0" /> Chats
             </TabsTrigger>
-            <TabsTrigger value="store" className="gap-1 text-xs md:text-sm px-2 md:px-3">
-              <Store className="w-3 h-3 md:w-3.5 md:h-3.5" /> Store
+            <TabsTrigger value="store" className="gap-1 text-xs md:text-sm px-2.5 md:px-3">
+              <Store className="w-3.5 h-3.5 shrink-0" /> Store
             </TabsTrigger>
-            <TabsTrigger value="knowledge" className="gap-1 text-xs md:text-sm px-2 md:px-3">
-              <BarChart3 className="w-3 h-3 md:w-3.5 md:h-3.5" /> Knowledge
+            <TabsTrigger value="knowledge" className="gap-1 text-xs md:text-sm px-2.5 md:px-3">
+              <BarChart3 className="w-3.5 h-3.5 shrink-0" /> <span className="hidden sm:inline">Knowledge</span><span className="sm:hidden">KB</span>
             </TabsTrigger>
-            <TabsTrigger value="contacts" className="gap-1 text-xs md:text-sm px-2 md:px-3">
-              <Users className="w-3 h-3 md:w-3.5 md:h-3.5" /> Contacts
+            <TabsTrigger value="contacts" className="gap-1 text-xs md:text-sm px-2.5 md:px-3">
+              <Users className="w-3.5 h-3.5 shrink-0" /> <span className="hidden sm:inline">Contacts</span><span className="sm:hidden">People</span>
             </TabsTrigger>
-            <TabsTrigger value="settings" className="gap-1 text-xs md:text-sm px-2 md:px-3">
-              <Settings2 className="w-3 h-3 md:w-3.5 md:h-3.5" /> Settings
+            <TabsTrigger value="settings" className="gap-1 text-xs md:text-sm px-2.5 md:px-3">
+              <Settings2 className="w-3.5 h-3.5 shrink-0" /> <span className="hidden sm:inline">Settings</span><span className="sm:hidden">Config</span>
             </TabsTrigger>
           </TabsList>
         </div>
@@ -911,13 +913,15 @@ export default function BusinessDetail() {
               </CardHeader>
               <CardContent>
                 {business.connectionType === "qr_session" && business.sessionStatus === "connected" ? (
-                  <div className="flex items-center gap-3 p-3 bg-green-50 border border-green-200 rounded-lg">
-                    <CheckCircle2 className="w-5 h-5 text-green-600 shrink-0" />
-                    <div>
-                      <p className="text-sm font-medium text-green-900">Connected</p>
-                      <p className="text-xs text-green-700 font-mono">+{business.connectedPhone}</p>
+                  <div className="flex flex-col sm:flex-row sm:items-center gap-3 p-3 bg-green-50 border border-green-200 rounded-lg">
+                    <div className="flex items-center gap-3 flex-1 min-w-0">
+                      <CheckCircle2 className="w-5 h-5 text-green-600 shrink-0" />
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium text-green-900">Connected</p>
+                        <p className="text-xs text-green-700 font-mono truncate">+{business.connectedPhone}</p>
+                      </div>
                     </div>
-                    <Button variant="ghost" size="sm" className="ml-auto text-red-600" onClick={async () => {
+                    <Button variant="ghost" size="sm" className="text-red-600 w-full sm:w-auto" onClick={async () => {
                       try {
                         await customFetch(`/api/sessions/${businessId}/disconnect`, { method: "POST" });
                       } catch {

@@ -11,8 +11,13 @@ import { PLANS, type PlanId } from "./pricing";
 
 declare global {
   interface Window {
-    Razorpay: new (opts: RazorpaySubscriptionOptions) => { open(): void };
+    Razorpay: new (opts: RazorpaySubscriptionOptions) => RazorpayInstance;
   }
+}
+
+interface RazorpayInstance {
+  open(): void;
+  on(event: string, cb: (response: { error?: { code?: string; description?: string; reason?: string } }) => void): void;
 }
 
 interface RazorpaySubscriptionOptions {
@@ -27,7 +32,7 @@ interface RazorpaySubscriptionOptions {
     razorpay_subscription_id: string;
     razorpay_signature: string;
   }) => void;
-  modal?: { ondismiss?: () => void };
+  modal?: { ondismiss?: () => void; escape?: boolean };
 }
 
 function loadRazorpayScript(): Promise<boolean> {
@@ -84,6 +89,9 @@ export default function Checkout() {
         body: JSON.stringify({ plan: planId, name, email, phone }),
       });
 
+      let paymentSucceeded = false;
+      let rzpError: string | null = null;
+
       const rzp = new window.Razorpay({
         key: sub.keyId,
         subscription_id: sub.subscriptionId,
@@ -92,6 +100,7 @@ export default function Checkout() {
         prefill: { name, email, contact: phone },
         theme: { color: "#00a884" },
         handler: async (response) => {
+          paymentSucceeded = true;
           try {
             const verified = await customFetch<{ verified: boolean; subscriptionId: string }>(
               "/api/payments/subscriptions/verify",
@@ -120,7 +129,26 @@ export default function Checkout() {
             });
           }
         },
-        modal: { ondismiss: () => setPaying(false) },
+        modal: {
+          ondismiss: () => {
+            setPaying(false);
+            if (!paymentSucceeded) {
+              if (rzpError) {
+                toast({
+                  title: "Payment failed",
+                  description: rzpError,
+                  variant: "destructive",
+                });
+              }
+            }
+          },
+        },
+      });
+
+      rzp.on("payment.failed", (response) => {
+        rzpError = response.error?.description
+          ?? response.error?.reason
+          ?? "Payment failed. Please try a different payment method.";
       });
 
       rzp.open();

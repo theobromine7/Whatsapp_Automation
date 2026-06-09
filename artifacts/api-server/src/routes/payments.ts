@@ -10,7 +10,7 @@ const router: IRouter = Router();
 const RAZORPAY_BASE = "https://api.razorpay.com/v1";
 
 const PLAN_AMOUNTS: Record<string, { amount: number; interval: number; label: string }> = {
-  starter: { amount: 49900,  interval: 1, label: "Wapp Starter Plan — ₹499/month" },
+  starter: { amount: 100,    interval: 1, label: "Wapp Starter Plan — ₹1/month"   },
   pro:     { amount: 99900,  interval: 1, label: "Wapp Pro Plan — ₹999/month"     },
 };
 

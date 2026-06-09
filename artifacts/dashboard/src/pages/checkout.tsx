@@ -351,20 +351,26 @@ export default function Checkout() {
               )}
 
               {showRzpGuide && isTestMode === false && (
-                <div className="bg-blue-50 border border-blue-200 rounded-xl p-3.5 space-y-2">
-                  <div className="flex items-center gap-2">
-                    <Info className="w-4 h-4 text-blue-600 shrink-0" />
-                    <p className="text-xs font-semibold text-blue-800">Complete the mandate in the Razorpay popup</p>
+                <div className="space-y-2">
+                  <div className="bg-blue-50 border border-blue-200 rounded-xl p-3.5 space-y-2">
+                    <div className="flex items-center gap-2">
+                      <Info className="w-4 h-4 text-blue-600 shrink-0" />
+                      <p className="text-xs font-semibold text-blue-800">Complete the mandate in the Razorpay popup</p>
+                    </div>
+                    <ol className="text-xs text-blue-700 space-y-1 leading-relaxed list-none">
+                      <li>1. Select <strong>UPI</strong> → confirm your UPI ID → click <strong>Proceed</strong></li>
+                      <li>2. Approve the mandate request from <strong>Advize Technologies</strong> in PhonePe / GPay / Paytm</li>
+                    </ol>
                   </div>
-                  <ol className="text-xs text-blue-700 space-y-1 leading-relaxed list-none">
-                    <li>1. Select <strong>UPI</strong> as payment method</li>
-                    <li>2. Your UPI ID is pre-filled — confirm it and click <strong>Proceed</strong></li>
-                    <li>3. Open <strong>PhonePe / GPay / Paytm</strong> and approve the mandate request from <strong>Advize Technologies</strong></li>
-                    <li>4. If asked to scan QR — scan it with your UPI app to approve</li>
-                  </ol>
-                  <p className="text-xs text-blue-600 mt-1">
-                    If nothing appears in your UPI app, your Razorpay account may need <strong>UPI AutoPay</strong> enabled — contact Razorpay support.
-                  </p>
+                  <div className="bg-amber-50 border border-amber-200 rounded-xl p-3.5 space-y-1.5">
+                    <div className="flex items-center gap-2">
+                      <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
+                      <p className="text-xs font-semibold text-amber-800">UPI AutoPay not working?</p>
+                    </div>
+                    <p className="text-xs text-amber-700 leading-relaxed">
+                      UPI AutoPay mandates require activation on your Razorpay account. While waiting, you can complete the subscription using a <strong>credit or debit card</strong> — select "Card" in the Razorpay popup instead.
+                    </p>
+                  </div>
                 </div>
               )}
 

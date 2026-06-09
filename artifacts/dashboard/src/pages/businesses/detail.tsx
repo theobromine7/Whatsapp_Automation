@@ -308,31 +308,33 @@ function QRConnectionPanel({ businessId, onConnected }: { businessId: number; on
             Enter your WhatsApp number to get an 8-digit pairing code — no QR scan needed.
           </p>
         </div>
-        <div className="flex gap-2">
-          <div className="flex items-center border rounded-md overflow-hidden focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-0 bg-background shrink-0 w-28">
-            <span className="pl-3 text-muted-foreground text-sm select-none">+</span>
-            <input
+        <div className="flex flex-col gap-2">
+          <div className="flex gap-2">
+            <div className="flex items-center border rounded-md overflow-hidden focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-0 bg-background shrink-0 w-24">
+              <span className="pl-3 text-muted-foreground text-sm select-none">+</span>
+              <input
+                type="tel"
+                inputMode="numeric"
+                placeholder="91"
+                value={countryCode}
+                onChange={(e) => setCountryCode(e.target.value.replace(/\D/g, "").slice(0, 4))}
+                onKeyDown={(e) => e.key === "Enter" && startPairingSession()}
+                className="w-full px-1.5 py-2 text-sm font-mono bg-transparent outline-none"
+              />
+            </div>
+            <Input
               type="tel"
               inputMode="numeric"
-              placeholder="91"
-              value={countryCode}
-              onChange={(e) => setCountryCode(e.target.value.replace(/\D/g, "").slice(0, 4))}
+              placeholder="Phone number"
+              value={phoneInput}
+              onChange={(e) => setPhoneInput(e.target.value.replace(/\D/g, ""))}
               onKeyDown={(e) => e.key === "Enter" && startPairingSession()}
-              className="w-full px-1.5 py-2 text-sm font-mono bg-transparent outline-none"
+              className="font-mono flex-1 min-w-0"
             />
           </div>
-          <Input
-            type="tel"
-            inputMode="numeric"
-            placeholder="Phone number"
-            value={phoneInput}
-            onChange={(e) => setPhoneInput(e.target.value.replace(/\D/g, ""))}
-            onKeyDown={(e) => e.key === "Enter" && startPairingSession()}
-            className="font-mono flex-1"
-          />
-          <Button onClick={startPairingSession} className="shrink-0">Get Code</Button>
+          <Button onClick={startPairingSession} className="w-full">Get Code</Button>
         </div>
-        <p className="text-xs text-muted-foreground -mt-2">
+        <p className="text-xs text-muted-foreground -mt-1">
           e.g. country code <span className="font-mono">91</span> + number <span className="font-mono">9876543210</span>
         </p>
         {errorMsg && <p className="text-sm text-red-600">{errorMsg}</p>}

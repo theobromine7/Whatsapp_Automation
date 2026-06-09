@@ -45,7 +45,7 @@ export const PLANS: Plan[] = [
   {
     id: "starter",
     name: "Starter",
-    price: 1,
+    price: 499,
     badge: "QR Only",
     description: "QR-based connection, no Meta account required. Great for small businesses.",
     icon: Zap,

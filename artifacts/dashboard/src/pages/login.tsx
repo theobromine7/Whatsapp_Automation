@@ -1,13 +1,17 @@
 import { useState } from "react";
 import { Link, useLocation, useSearch } from "wouter";
-import { MessageCircle, Loader2, LogIn } from "lucide-react";
+import { MessageCircle, Loader2, LogIn, LogOut } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { loginWithEmail, loginWithGoogle } from "@/lib/firebase";
+import { loginWithEmail, loginWithGoogle, logout } from "@/lib/firebase";
+import { useAuth } from "@/contexts/AuthContext";
+import { useQueryClient } from "@tanstack/react-query";
 
 export default function Login() {
   const [, setLocation] = useLocation();
   const search = useSearch();
   const redirectTo = new URLSearchParams(search).get("from") ?? "/inbox";
+  const { user, loading: authLoading } = useAuth();
+  const queryClient = useQueryClient();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
@@ -39,6 +43,61 @@ export default function Login() {
     } finally {
       setGoogleLoading(false);
     }
+  }
+
+  async function handleLogout() {
+    try {
+      await logout();
+      queryClient.clear();
+    } catch {
+      // ignore
+    }
+  }
+
+  if (authLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-muted/30">
+        <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+
+  if (user) {
+    const displayName = user.displayName ?? user.email ?? "there";
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-muted/30 px-4">
+        <div className="w-full max-w-sm">
+          <div className="flex flex-col items-center mb-8 gap-2">
+            <img src="/logo.png" alt="Wapp" className="w-24 h-24 object-contain" />
+            <h1 className="text-2xl font-bold tracking-tight">You're signed in</h1>
+            <p className="text-sm text-muted-foreground text-center">
+              Hi {displayName}! Where would you like to go?
+            </p>
+          </div>
+          <div className="bg-background border rounded-xl p-6 shadow-sm space-y-3">
+            <Button className="w-full gap-2" onClick={() => setLocation("/inbox")}>
+              <MessageCircle className="w-4 h-4" />
+              Open Chat
+            </Button>
+            <Button variant="outline" className="w-full gap-2" onClick={() => setLocation("/dashboard")}>
+              Go to Dashboard
+            </Button>
+            <div className="relative pt-1">
+              <div className="absolute inset-0 flex items-center">
+                <div className="w-full border-t" />
+              </div>
+              <div className="relative flex justify-center text-xs text-muted-foreground">
+                <span className="bg-background px-2">or</span>
+              </div>
+            </div>
+            <Button variant="ghost" className="w-full gap-2 text-muted-foreground hover:text-red-600 hover:bg-red-50" onClick={handleLogout}>
+              <LogOut className="w-4 h-4" />
+              Sign out
+            </Button>
+          </div>
+        </div>
+      </div>
+    );
   }
 
   return (

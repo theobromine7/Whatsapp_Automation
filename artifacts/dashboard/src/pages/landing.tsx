@@ -9,7 +9,7 @@ const FEATURES = [
   {
     icon: Bot,
     title: "AI-Powered Responses",
-    desc: "Gemini AI answers customer queries 24/7 — in their language, instantly.",
+    desc: "AI answers customer queries 24/7 — in their language, instantly.",
   },
   {
     icon: ShoppingBag,
@@ -62,7 +62,7 @@ export default function Landing() {
       <section className="flex-1 flex flex-col items-center justify-center text-center px-6 py-20">
         <div className="inline-flex items-center gap-2 bg-primary/10 text-primary text-xs font-semibold px-3 py-1.5 rounded-full mb-6">
           <Zap className="w-3.5 h-3.5" />
-          Powered by Gemini AI
+          Verified by Meta
         </div>
         <h1 className="text-4xl sm:text-5xl md:text-6xl font-extrabold tracking-tight max-w-3xl leading-tight">
           Turn WhatsApp into your{" "}

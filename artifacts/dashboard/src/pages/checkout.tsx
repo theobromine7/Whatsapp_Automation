@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useRoute, useLocation, Link } from "wouter";
-import { ArrowLeft, Crown, Zap, Check, Loader2, CheckCircle2, MessageSquare, ShieldCheck, Gift, RefreshCw } from "lucide-react";
+import { ArrowLeft, Crown, Zap, Check, Loader2, CheckCircle2, MessageSquare, ShieldCheck, Gift, RefreshCw, AlertTriangle, Info } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -25,7 +25,7 @@ interface RazorpaySubscriptionOptions {
   subscription_id: string;
   name: string;
   description: string;
-  prefill?: { name?: string; email?: string; contact?: string };
+  prefill?: { name?: string; email?: string; contact?: string; vpa?: string };
   theme?: { color?: string };
   handler: (response: {
     razorpay_payment_id: string;
@@ -60,6 +60,8 @@ export default function Checkout() {
   const [paying, setPaying] = useState(false);
   const [done, setDone] = useState(false);
   const [subscriptionId, setSubscriptionId] = useState("");
+  const [isTestMode, setIsTestMode] = useState<boolean | null>(null);
+  const [showRzpGuide, setShowRzpGuide] = useState(false);
 
   const isPro = plan.id === "pro";
   const Icon = isPro ? Crown : plan.id === "starter" ? Zap : Gift;
@@ -85,11 +87,14 @@ export default function Checkout() {
         subscriptionId: string;
         keyId: string;
         planLabel: string;
+        isTestMode: boolean;
       }>("/api/payments/subscriptions", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ plan: planId, name, email }),
       });
+
+      setIsTestMode(sub.isTestMode);
 
       let paymentSucceeded = false;
       let rzpError: string | null = null;
@@ -103,6 +108,7 @@ export default function Checkout() {
         theme: { color: "#00a884" },
         handler: async (response) => {
           paymentSucceeded = true;
+          setShowRzpGuide(false);
           try {
             const verified = await customFetch<{ verified: boolean; subscriptionId: string }>(
               "/api/payments/subscriptions/verify",
@@ -134,14 +140,13 @@ export default function Checkout() {
         modal: {
           ondismiss: () => {
             setPaying(false);
-            if (!paymentSucceeded) {
-              if (rzpError) {
-                toast({
-                  title: "Payment failed",
-                  description: rzpError,
-                  variant: "destructive",
-                });
-              }
+            setShowRzpGuide(false);
+            if (!paymentSucceeded && rzpError) {
+              toast({
+                title: "Payment failed",
+                description: rzpError,
+                variant: "destructive",
+              });
             }
           },
         },
@@ -153,6 +158,7 @@ export default function Checkout() {
           ?? "Payment failed. Please try a different payment method.";
       });
 
+      setShowRzpGuide(true);
       rzp.open();
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Something went wrong";
@@ -328,6 +334,39 @@ export default function Checkout() {
                   <><RefreshCw className="w-4 h-4" /> Set Up AutoPay — ₹{plan.price}/mo</>
                 )}
               </Button>
+
+              {showRzpGuide && isTestMode === true && (
+                <div className="bg-amber-50 border border-amber-200 rounded-xl p-3.5 space-y-2">
+                  <div className="flex items-center gap-2">
+                    <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
+                    <p className="text-xs font-semibold text-amber-800">Test mode — use these credentials</p>
+                  </div>
+                  <div className="bg-white border border-amber-200 rounded-lg px-3 py-2 font-mono text-sm font-bold text-amber-900 select-all">
+                    success@razorpay
+                  </div>
+                  <p className="text-xs text-amber-700 leading-relaxed">
+                    In the Razorpay popup → select <strong>UPI</strong> → enter <strong>success@razorpay</strong> as the UPI ID → click Proceed. This simulates a successful mandate. Real UPI IDs don't work in test mode.
+                  </p>
+                </div>
+              )}
+
+              {showRzpGuide && isTestMode === false && (
+                <div className="bg-blue-50 border border-blue-200 rounded-xl p-3.5 space-y-2">
+                  <div className="flex items-center gap-2">
+                    <Info className="w-4 h-4 text-blue-600 shrink-0" />
+                    <p className="text-xs font-semibold text-blue-800">Complete the mandate in the Razorpay popup</p>
+                  </div>
+                  <ol className="text-xs text-blue-700 space-y-1 leading-relaxed list-none">
+                    <li>1. Select <strong>UPI</strong> as payment method</li>
+                    <li>2. Your UPI ID is pre-filled — confirm it and click <strong>Proceed</strong></li>
+                    <li>3. Open <strong>PhonePe / GPay / Paytm</strong> and approve the mandate request from <strong>Advize Technologies</strong></li>
+                    <li>4. If asked to scan QR — scan it with your UPI app to approve</li>
+                  </ol>
+                  <p className="text-xs text-blue-600 mt-1">
+                    If nothing appears in your UPI app, your Razorpay account may need <strong>UPI AutoPay</strong> enabled — contact Razorpay support.
+                  </p>
+                </div>
+              )}
 
               <p className="text-center text-xs text-[#8696a0]">
                 By subscribing you agree to our{" "}

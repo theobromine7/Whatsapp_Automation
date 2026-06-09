@@ -134,11 +134,13 @@ router.post("/payments/subscriptions", requireAuth, async (req, res): Promise<vo
 
     logger.info({ plan, subscriptionId: subscription.id, uid: req.user!.uid }, "Razorpay subscription created");
 
+    const keyId = process.env["RAZORPAY_KEY_ID"]!;
     res.json({
       subscriptionId: subscription.id,
-      keyId: process.env["RAZORPAY_KEY_ID"],
+      keyId,
       plan,
       planLabel: PLAN_AMOUNTS[plan]!.label,
+      isTestMode: keyId.startsWith("rzp_test_"),
     });
   } catch (err) {
     logger.error({ err }, "Failed to create Razorpay subscription");

@@ -54,9 +54,9 @@ export default function Checkout() {
   const planId = (params?.plan ?? "starter") as PlanId;
   const plan = PLANS.find((p) => p.id === planId) ?? PLANS[1]!;
 
+  const [upiId, setUpiId] = useState("");
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
-  const [phone, setPhone] = useState("");
   const [paying, setPaying] = useState(false);
   const [done, setDone] = useState(false);
   const [subscriptionId, setSubscriptionId] = useState("");
@@ -66,9 +66,11 @@ export default function Checkout() {
 
   useEffect(() => { loadRazorpayScript(); }, []);
 
+  const upiValid = /^[\w.\-]+@[\w.\-]+$/.test(upiId.trim());
+
   const handleSubscribe = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!name.trim() || !email.trim() || !phone.trim()) return;
+    if (!upiId.trim() || !upiValid) return;
     setPaying(true);
 
     try {
@@ -86,7 +88,7 @@ export default function Checkout() {
       }>("/api/payments/subscriptions", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ plan: planId, name, email, phone }),
+        body: JSON.stringify({ plan: planId, name, email }),
       });
 
       let paymentSucceeded = false;
@@ -95,9 +97,9 @@ export default function Checkout() {
       const rzp = new window.Razorpay({
         key: sub.keyId,
         subscription_id: sub.subscriptionId,
-        name: "Wapp",
-        description: sub.planLabel,
-        prefill: { name, email, contact: phone },
+        name: "Advize Technologies",
+        description: `Wapp – ${sub.planLabel}`,
+        prefill: { name, email, vpa: upiId.trim() },
         theme: { color: "#00a884" },
         handler: async (response) => {
           paymentSucceeded = true;
@@ -247,10 +249,13 @@ export default function Checkout() {
             <div className="bg-[#f0fdf8] border border-[#bbf7d0] rounded-xl p-3.5 flex items-start gap-2.5">
               <RefreshCw className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
               <div>
-                <p className="text-xs font-semibold text-emerald-800">AutoPay Mandate</p>
-                <p className="text-xs text-emerald-700 mt-0.5 leading-relaxed">
-                  Set up once. Billed automatically every month via UPI AutoPay, card, or net banking. Cancel anytime from Settings.
-                </p>
+                <p className="text-xs font-semibold text-emerald-800">How UPI AutoPay works</p>
+                <ol className="text-xs text-emerald-700 mt-1 space-y-1 leading-relaxed list-none">
+                  <li>1. Enter your UPI ID below</li>
+                  <li>2. You'll get a mandate request on your UPI app (PhonePe / GPay / Paytm) from <strong>Advize Technologies</strong></li>
+                  <li>3. Approve once — billing is automatic every month</li>
+                  <li>4. Cancel anytime from Settings</li>
+                </ol>
               </div>
             </div>
 
@@ -265,25 +270,40 @@ export default function Checkout() {
           <div className="md:col-span-3">
             <form onSubmit={handleSubscribe} className="bg-white rounded-2xl border border-[#e9edef] p-5 space-y-4">
               <div>
-                <h2 className="font-semibold text-[#111b21] mb-1">Activate AutoPay</h2>
+                <h2 className="font-semibold text-[#111b21] mb-1">Enter your UPI ID</h2>
                 <p className="text-xs text-[#8696a0]">
-                  You'll set up your UPI AutoPay mandate on Razorpay's secure page. First charge is today.
+                  Razorpay will send an AutoPay mandate request to this UPI ID on behalf of <strong>Advize Technologies</strong>. Approve it in your UPI app to complete setup.
                 </p>
               </div>
 
               <div>
-                <label className="block text-xs font-medium text-[#667781] mb-1.5">Full name</label>
-                <Input required placeholder="Your name" value={name} onChange={(e) => setName(e.target.value)} disabled={paying} />
+                <label className="block text-xs font-medium text-[#667781] mb-1.5">
+                  UPI ID <span className="text-[#8696a0] font-normal">(e.g. yourname@okaxis, 98765@ybl)</span>
+                </label>
+                <Input
+                  required
+                  placeholder="yourname@okaxis"
+                  value={upiId}
+                  onChange={(e) => setUpiId(e.target.value)}
+                  disabled={paying}
+                  className={cn(
+                    upiId.trim() && !upiValid && "border-red-400 focus-visible:ring-red-400"
+                  )}
+                />
+                {upiId.trim() && !upiValid && (
+                  <p className="text-xs text-red-500 mt-1">Please enter a valid UPI ID (e.g. name@okaxis)</p>
+                )}
               </div>
 
-              <div>
-                <label className="block text-xs font-medium text-[#667781] mb-1.5">Email address</label>
-                <Input required type="email" placeholder="you@example.com" value={email} onChange={(e) => setEmail(e.target.value)} disabled={paying} />
-              </div>
-
-              <div>
-                <label className="block text-xs font-medium text-[#667781] mb-1.5">Phone number</label>
-                <Input required type="tel" placeholder="+91 98765 43210" value={phone} onChange={(e) => setPhone(e.target.value)} disabled={paying} />
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-medium text-[#667781] mb-1.5">Name <span className="text-[#8696a0] font-normal">(optional)</span></label>
+                  <Input placeholder="Your name" value={name} onChange={(e) => setName(e.target.value)} disabled={paying} />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-[#667781] mb-1.5">Email <span className="text-[#8696a0] font-normal">(for receipt)</span></label>
+                  <Input type="email" placeholder="you@example.com" value={email} onChange={(e) => setEmail(e.target.value)} disabled={paying} />
+                </div>
               </div>
 
               <div className="bg-[#f8f9fa] rounded-xl px-4 py-3 space-y-1">
@@ -291,7 +311,7 @@ export default function Checkout() {
                   <span className="text-sm font-medium text-[#111b21]">First charge today</span>
                   <span className="text-lg font-bold text-[#111b21]">₹{plan.price}</span>
                 </div>
-                <p className="text-xs text-[#8696a0]">Then ₹{plan.price}/month automatically</p>
+                <p className="text-xs text-[#8696a0]">Then ₹{plan.price}/month automatically via UPI AutoPay</p>
               </div>
 
               <Button
@@ -300,10 +320,10 @@ export default function Checkout() {
                   "w-full gap-2 h-11 text-sm font-semibold",
                   "bg-[#00a884] hover:bg-[#008f71] text-white border-0"
                 )}
-                disabled={paying}
+                disabled={paying || !upiValid}
               >
                 {paying ? (
-                  <><Loader2 className="w-4 h-4 animate-spin" /> Opening Razorpay…</>
+                  <><Loader2 className="w-4 h-4 animate-spin" /> Sending mandate request…</>
                 ) : (
                   <><RefreshCw className="w-4 h-4" /> Set Up AutoPay — ₹{plan.price}/mo</>
                 )}

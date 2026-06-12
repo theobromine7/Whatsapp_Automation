@@ -8,6 +8,9 @@ import {
   removeSSEClient,
   getSessionStatus,
   startPairingCodeSession,
+  getSessionWaChats,
+  getSessionWaMsgs,
+  sendMessageViaSession,
 } from "../lib/session-manager";
 import { requireAuth } from "../lib/auth-middleware";
 
@@ -98,6 +101,43 @@ router.post("/sessions/:businessId/disconnect", requireAuth, async (req, res): P
 
   await stopSession(businessId);
   res.json({ businessId, status: "disconnected" });
+});
+
+router.get("/sessions/:businessId/whatsapp-chats", requireAuth, async (req, res): Promise<void> => {
+  const businessId = parseBusinessId(req.params.businessId!);
+  const business = await getOwnedBusiness(businessId, req.user!.uid);
+  if (!business) { res.status(404).json({ error: "Business not found" }); return; }
+
+  const chats = getSessionWaChats(businessId);
+  res.json(chats);
+});
+
+router.get("/sessions/:businessId/whatsapp-chats/:jid/messages", requireAuth, async (req, res): Promise<void> => {
+  const businessId = parseBusinessId(req.params.businessId!);
+  const business = await getOwnedBusiness(businessId, req.user!.uid);
+  if (!business) { res.status(404).json({ error: "Business not found" }); return; }
+
+  const rawJid = Array.isArray(req.params.jid) ? req.params.jid[0]! : req.params.jid!;
+  const jid = decodeURIComponent(rawJid);
+  const msgs = getSessionWaMsgs(businessId, jid);
+  res.json(msgs);
+});
+
+router.post("/sessions/:businessId/send", requireAuth, async (req, res): Promise<void> => {
+  const businessId = parseBusinessId(req.params.businessId!);
+  const business = await getOwnedBusiness(businessId, req.user!.uid);
+  if (!business) { res.status(404).json({ error: "Business not found" }); return; }
+
+  const { jid, text } = req.body as { jid?: string; text?: string };
+  if (!jid || !text?.trim()) { res.status(400).json({ error: "jid and text are required" }); return; }
+
+  try {
+    await sendMessageViaSession(businessId, jid, text.trim());
+    res.json({ ok: true });
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : "Failed to send message";
+    res.status(500).json({ error: message });
+  }
 });
 
 export default router;

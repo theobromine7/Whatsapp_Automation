@@ -33,6 +33,66 @@ const pendingPairingCodes = new Map<number, (code: string | null, err?: Error) =
 // as opposed to contact.notify (the contact's own chosen display name).
 const sessionSavedContacts = new Map<number, Set<string>>();
 
+// ── WhatsApp chat inbox sync ──────────────────────────────────────────────────
+
+interface WaChat {
+  jid: string;
+  name: string | null;
+  notify: string | null;
+  lastMessage: string | null;
+  lastMessageTs: number;
+  fromMe: boolean;
+  unreadCount: number;
+  isGroup: boolean;
+}
+
+interface WaMsg {
+  id: string;
+  text: string;
+  fromMe: boolean;
+  ts: number;
+  pushName: string | null;
+}
+
+const MAX_WA_MSGS_PER_CHAT = 30;
+const sessionWaChats = new Map<number, Map<string, WaChat>>();
+const sessionWaMsgs = new Map<number, Map<string, WaMsg[]>>();
+
+function toTsSeconds(ts: unknown): number {
+  if (!ts) return 0;
+  if (typeof ts === "number") return ts;
+  if (typeof ts === "bigint") return Number(ts);
+  if (typeof ts === "object" && ts !== null && "low" in ts) return Number((ts as { low: number }).low);
+  return 0;
+}
+
+function getWaMsgText(msg: Record<string, unknown>): string | null {
+  return (msg.conversation as string | undefined) ||
+    (msg.extendedTextMessage as { text?: string } | undefined)?.text ||
+    (msg.imageMessage as { caption?: string } | undefined)?.caption ||
+    (msg.imageMessage ? "📷 Photo" : null) ||
+    (msg.videoMessage ? "🎥 Video" : null) ||
+    (msg.audioMessage ? "🎵 Voice message" : null) ||
+    ((msg.documentMessage as { fileName?: string } | undefined)
+      ? `📄 ${(msg.documentMessage as { fileName?: string }).fileName ?? "Document"}`
+      : null) ||
+    (msg.stickerMessage ? "Sticker" : null) ||
+    null;
+}
+
+export function getSessionWaChats(businessId: number): WaChat[] {
+  const waChats = sessionWaChats.get(businessId);
+  if (!waChats) return [];
+  return Array.from(waChats.values())
+    .filter((c) => c.lastMessageTs > 0)
+    .sort((a, b) => b.lastMessageTs - a.lastMessageTs)
+    .slice(0, 150);
+}
+
+export function getSessionWaMsgs(businessId: number, jid: string): WaMsg[] {
+  return sessionWaMsgs.get(businessId)?.get(jid) ?? [];
+}
+
 function clearRestartTimer(businessId: number): void {
   const timer = restartTimers.get(businessId);
   if (timer) {
@@ -144,6 +204,12 @@ export async function startSession(businessId: number, pairingPhone?: string): P
   });
 
   entry.socket = sock;
+
+  // Per-session WA chat store — populated by chats.set on connect and updated by messages.upsert.
+  const waChats = sessionWaChats.get(businessId) ?? new Map<string, WaChat>();
+  sessionWaChats.set(businessId, waChats);
+  const waMsgs = sessionWaMsgs.get(businessId) ?? new Map<string, WaMsg[]>();
+  sessionWaMsgs.set(businessId, waMsgs);
 
   // Pairing-code flow: request the code after Baileys connects to WA servers
   if (pairingPhone && !state.creds.registered) {
@@ -286,6 +352,13 @@ export async function startSession(businessId: number, pairingPhone?: string): P
     for (const contact of contacts) {
       if (contact.name) {
         savedContacts.add(contact.id);
+        const chat = waChats.get(contact.id);
+        if (chat) waChats.set(contact.id, { ...chat, name: contact.name });
+      }
+      const notify = (contact as unknown as { notify?: string }).notify;
+      if (notify) {
+        const chat = waChats.get(contact.id);
+        if (chat && !chat.name) waChats.set(contact.id, { ...chat, notify });
       }
     }
     logger.info({ businessId, savedCount: savedContacts.size }, "Saved contacts updated");
@@ -296,9 +369,68 @@ export async function startSession(businessId: number, pairingPhone?: string): P
       if (!update.id) continue;
       if (update.name) {
         savedContacts.add(update.id);
+        const chat = waChats.get(update.id);
+        if (chat) waChats.set(update.id, { ...chat, name: update.name });
       } else if (update.name === null) {
         savedContacts.delete(update.id);
       }
+      const notify = (update as unknown as { notify?: string }).notify;
+      if (notify) {
+        const chat = waChats.get(update.id);
+        if (chat && !chat.name) waChats.set(update.id, { ...chat, notify });
+      }
+    }
+  });
+
+  // ── WhatsApp chat list sync ─────────────────────────────────────────────────
+  // 'chats.set' / 'messaging-history.set' fires on initial sync when the
+  // session connects — delivers the recent chat list for the inbox sidebar.
+  // Cast through any: Baileys RC type definitions may not include these keys.
+  const sockEv = sock.ev as unknown as {
+    on: (event: string, handler: (...args: any[]) => void) => void;
+  };
+
+  sockEv.on("chats.set", (data: { chats?: unknown[] }) => {
+    const chats = Array.isArray(data?.chats) ? data.chats : (Array.isArray(data) ? data as unknown[] : []);
+    for (const chat of chats) {
+      const c = chat as Record<string, unknown>;
+      const jid = c["id"] as string | undefined;
+      if (!jid) continue;
+      const ts = toTsSeconds(c["conversationTimestamp"]);
+      const existing = waChats.get(jid);
+      waChats.set(jid, {
+        jid,
+        name: (c["name"] as string | undefined) ?? existing?.name ?? null,
+        notify: existing?.notify ?? null,
+        lastMessage: existing?.lastMessage ?? null,
+        lastMessageTs: ts || (existing?.lastMessageTs ?? 0),
+        fromMe: existing?.fromMe ?? false,
+        unreadCount: (c["unreadCount"] as number | undefined) ?? existing?.unreadCount ?? 0,
+        isGroup: jid.endsWith("@g.us"),
+      });
+    }
+    logger.info({ businessId, count: waChats.size }, "WhatsApp chats synced on connect");
+    broadcastToSSE(businessId, { type: "chats_synced", count: waChats.size });
+  });
+
+  sockEv.on("chats.update", (updates: unknown[]) => {
+    const list = Array.isArray(updates) ? updates : [];
+    for (const upd of list) {
+      const u = upd as Record<string, unknown>;
+      const jid = u["id"] as string | undefined;
+      if (!jid) continue;
+      const existing = waChats.get(jid);
+      const ts = toTsSeconds(u["conversationTimestamp"]);
+      waChats.set(jid, {
+        jid,
+        name: (u["name"] as string | undefined) ?? existing?.name ?? null,
+        notify: existing?.notify ?? null,
+        lastMessage: existing?.lastMessage ?? null,
+        lastMessageTs: ts || (existing?.lastMessageTs ?? 0),
+        fromMe: existing?.fromMe ?? false,
+        unreadCount: (u["unreadCount"] as number | undefined) ?? existing?.unreadCount ?? 0,
+        isGroup: jid.endsWith("@g.us"),
+      });
     }
   });
 
@@ -310,9 +442,43 @@ export async function startSession(businessId: number, pairingPhone?: string): P
     for (const msg of messages) {
       if (!msg.message) continue;
       const jid = msg.key.remoteJid;
+      if (!jid) continue;
+
+      // ── WA Sidebar Chat Tracking (all chats including groups) ─────────────
+      {
+        const text = getWaMsgText(msg.message as Record<string, unknown>);
+        const ts = toTsSeconds(msg.messageTimestamp) || Math.floor(Date.now() / 1000);
+        const existing = waChats.get(jid);
+        waChats.set(jid, {
+          jid,
+          name: existing?.name ?? null,
+          notify: msg.pushName ?? existing?.notify ?? null,
+          lastMessage: text ?? existing?.lastMessage ?? null,
+          lastMessageTs: ts,
+          fromMe: msg.key.fromMe ?? false,
+          unreadCount: msg.key.fromMe ? 0 : (existing?.unreadCount ?? 0) + 1,
+          isGroup: jid.endsWith("@g.us"),
+        });
+        if (text) {
+          const chatMsgs = waMsgs.get(jid) ?? [];
+          chatMsgs.push({
+            id: msg.key.id ?? String(ts),
+            text,
+            fromMe: msg.key.fromMe ?? false,
+            ts,
+            pushName: msg.pushName ?? null,
+          });
+          if (chatMsgs.length > MAX_WA_MSGS_PER_CHAT) {
+            chatMsgs.splice(0, chatMsgs.length - MAX_WA_MSGS_PER_CHAT);
+          }
+          waMsgs.set(jid, chatMsgs);
+        }
+      }
+      // ─────────────────────────────────────────────────────────────────────
+
       // Accept real 1-on-1 messages: standard @s.whatsapp.net and newer
-      // privacy-preserving @lid JIDs. Skip groups (@g.us) and newsletters (@newsletter).
-      if (!jid || (!jid.endsWith("@s.whatsapp.net") && !jid.endsWith("@lid"))) continue;
+      // privacy-preserving @lid JIDs. Skip groups (@g.us) and newsletters.
+      if (!jid.endsWith("@s.whatsapp.net") && !jid.endsWith("@lid")) continue;
 
       // ── Human Takeover Detection ──────────────────────────────────────────
       // When the owner sends a message from their phone (fromMe), silence AI
@@ -341,8 +507,6 @@ export async function startSession(businessId: number, pairingPhone?: string): P
       // ─────────────────────────────────────────────────────────────────────
 
       // Strip domain and optional multi-device suffix
-      // e.g. "919140600553:5@s.whatsapp.net" → "919140600553"
-      // e.g. "173237656879273@lid" → "173237656879273"
       const senderPhone = jid.split("@")[0].split(":")[0];
       const text =
         msg.message.conversation ||
@@ -411,6 +575,8 @@ export async function stopSession(businessId: number): Promise<void> {
   }
 
   sessionSavedContacts.delete(businessId);
+  sessionWaChats.delete(businessId);
+  sessionWaMsgs.delete(businessId);
 
   // Delete session files so the server won't auto-restore this session on restart
   const sessionDir = path.join(SESSIONS_DIR, String(businessId));

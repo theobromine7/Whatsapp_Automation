@@ -77,7 +77,7 @@ type StreamEvent =
   | { type: "pairing_error"; message: string };
 
 function QRConnectionPanel({ businessId, onConnected }: { businessId: number; onConnected: () => void }) {
-  const [phase, setPhase] = useState<"idle" | "starting" | "qr" | "connected" | "error" | "pairing_input" | "pairing_wait" | "pairing_code">("idle");
+  const [phase, setPhase] = useState<"idle" | "starting" | "qr" | "connected" | "error" | "pairing_input" | "pairing_wait" | "pairing_code" | "pairing_failed">("idle");
   const [qrDataUrl, setQrDataUrl] = useState<string | null>(null);
   const [connectedPhone, setConnectedPhone] = useState<string | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -121,11 +121,17 @@ function QRConnectionPanel({ businessId, onConnected }: { businessId: number; on
           setPhase("starting");
           setQrDataUrl(null);
         } else if (data.type === "disconnected") {
-          // "logged_out" = removed from phone; "manual" = clicked Disconnect; others = retry
-          if (data.reason === "logged_out" || data.reason === "manual") {
+          if (data.reason === "manual") {
             setPhase("idle");
             setQrDataUrl(null);
             setConnectedPhone(null);
+            es.close();
+          } else if (data.reason === "logged_out") {
+            // Auth rejected by WhatsApp — show a clear error instead of silently resetting
+            setPhase("pairing_failed");
+            setErrorMsg("WhatsApp rejected the pairing code. The code may have expired — please try again.");
+            setQrDataUrl(null);
+            setPairingCode(null);
             es.close();
           } else {
             setPhase("starting");
@@ -186,15 +192,21 @@ function QRConnectionPanel({ businessId, onConnected }: { businessId: number; on
     setPairingCode(null);
     setErrorMsg(null);
     try {
-      await customFetch(`/api/sessions/${businessId}/pairing-code`, {
+      // The API now waits for Baileys to generate the code and returns it directly —
+      // no SSE race condition. We open the SSE stream only to receive the final
+      // connected / disconnected result after the user enters the code.
+      const result = await customFetch(`/api/sessions/${businessId}/pairing-code`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ phone: digits }),
-      });
+      }) as { code: string };
+      setPairingCode(result.code);
+      setPhase("pairing_code");
       openStream(businessId);
-    } catch {
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Could not generate pairing code. Try again.";
       setPhase("pairing_input");
-      setErrorMsg("Could not start session. Check server logs.");
+      setErrorMsg(msg);
     }
   };
 
@@ -274,6 +286,25 @@ function QRConnectionPanel({ businessId, onConnected }: { businessId: number; on
     );
   }
 
+  if (phase === "pairing_failed") {
+    return (
+      <div className="flex flex-col items-center gap-5 py-6">
+        <div className="w-12 h-12 rounded-full bg-red-50 flex items-center justify-center">
+          <WifiOff className="w-6 h-6 text-red-500" />
+        </div>
+        <div className="text-center px-2">
+          <p className="font-semibold text-foreground mb-1">Pairing failed</p>
+          <p className="text-sm text-muted-foreground max-w-xs leading-relaxed">
+            {errorMsg ?? "WhatsApp rejected the pairing code. Enter the code within 2 minutes of it appearing."}
+          </p>
+        </div>
+        <Button size="sm" onClick={() => { setPhase("pairing_input"); setErrorMsg(null); }}>
+          <RefreshCw className="w-3.5 h-3.5 mr-1.5" /> Try again
+        </Button>
+      </div>
+    );
+  }
+
   if (phase === "pairing_code" && pairingCode) {
     return (
       <div className="flex flex-col items-center gap-6 py-6">
@@ -286,14 +317,14 @@ function QRConnectionPanel({ businessId, onConnected }: { businessId: number; on
         <div className="px-8 py-5 bg-primary/5 border-2 border-primary/20 rounded-2xl text-center">
           <p className="text-xs text-muted-foreground mb-2 font-medium uppercase tracking-wider">Pairing Code</p>
           <p className="text-4xl font-bold font-mono tracking-widest text-primary">{pairingCode}</p>
-          <p className="text-xs text-muted-foreground mt-2">Valid for a few minutes</p>
+          <p className="text-xs text-muted-foreground mt-2">Valid for ~2 minutes — enter it quickly</p>
         </div>
         <div className="flex items-center gap-2 text-sm text-muted-foreground animate-pulse">
           <Loader2 className="w-4 h-4 animate-spin" />
-          Waiting for you to enter the code...
+          Waiting for you to enter the code in WhatsApp...
         </div>
-        <Button variant="ghost" size="sm" onClick={() => { setPhase("pairing_input"); setPairingCode(null); }} className="text-muted-foreground">
-          <RefreshCw className="w-3.5 h-3.5 mr-1.5" /> Try again
+        <Button variant="ghost" size="sm" onClick={() => { setPhase("pairing_input"); setPairingCode(null); eventSourceRef.current?.close(); }} className="text-muted-foreground">
+          <RefreshCw className="w-3.5 h-3.5 mr-1.5" /> Try again with a new code
         </Button>
       </div>
     );

@@ -7,6 +7,7 @@ import {
   addSSEClient,
   removeSSEClient,
   getSessionStatus,
+  startPairingCodeSession,
 } from "../lib/session-manager";
 import { requireAuth } from "../lib/auth-middleware";
 
@@ -77,11 +78,17 @@ router.post("/sessions/:businessId/pairing-code", requireAuth, async (req, res):
   const phone = rawPhone.replace(/\D/g, ""); // digits only, e.g. "919876543210"
   if (!phone || phone.length < 7) { res.status(400).json({ error: "Valid phone number required (with country code)" }); return; }
 
-  startSession(businessId, phone).catch((err) => {
-    req.log.error({ err, businessId }, "Pairing session start failed");
-  });
-
-  res.json({ businessId, status: "starting" });
+  try {
+    // Wait for Baileys to generate the code, then return it directly in the response.
+    // This eliminates the SSE race condition where the code fires before the client connects.
+    const code = await startPairingCodeSession(businessId, phone);
+    req.log.info({ businessId, pairingPhone: phone }, "Pairing code returned in HTTP response");
+    res.json({ businessId, status: "ok", code });
+  } catch (err: unknown) {
+    req.log.error({ err, businessId }, "Pairing code session failed");
+    const message = err instanceof Error ? err.message : "Failed to generate pairing code";
+    res.status(500).json({ error: message });
+  }
 });
 
 router.post("/sessions/:businessId/disconnect", requireAuth, async (req, res): Promise<void> => {

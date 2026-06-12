@@ -17,12 +17,16 @@ interface SessionEntry {
   sseClients: Set<Response>;
   status: "connecting" | "connected" | "disconnected";
   qrDataUrl: string | null;
+  pairingCode: string | null;
   connectedPhone: string | null;
   connectAttempts: number;
 }
 
 const sessions = new Map<number, SessionEntry>();
 const restartTimers = new Map<number, ReturnType<typeof setTimeout>>();
+
+// Resolvers waiting for the pairing code to arrive — keyed by businessId
+const pendingPairingCodes = new Map<number, (code: string | null, err?: Error) => void>();
 
 // Per-session map of JID → true for contacts saved in the owner's address book.
 // A contact is "saved" when Baileys reports contact.name (set by the owner),
@@ -98,6 +102,7 @@ export async function startSession(businessId: number, pairingPhone?: string): P
     sseClients,
     status: "connecting",
     qrDataUrl: null,
+    pairingCode: null,
     connectedPhone: null,
     connectAttempts,
   };
@@ -140,20 +145,32 @@ export async function startSession(businessId: number, pairingPhone?: string): P
 
   entry.socket = sock;
 
-  // Pairing-code flow: after the socket connects to WA servers (~2s), request the code
+  // Pairing-code flow: request the code after Baileys connects to WA servers
   if (pairingPhone && !state.creds.registered) {
     setTimeout(async () => {
       try {
         const code: string = await (sock as any).requestPairingCode(pairingPhone);
         // Format as XXXX-XXXX for readability
         const formatted = code.length === 8 ? `${code.slice(0, 4)}-${code.slice(4)}` : code;
+        entry.pairingCode = formatted;
+        // Resolve any HTTP request waiting for the code
+        const pending = pendingPairingCodes.get(businessId);
+        if (pending) {
+          pending(formatted);
+          pendingPairingCodes.delete(businessId);
+        }
         broadcastToSSE(businessId, { type: "pairing_code", code: formatted });
         logger.info({ businessId, pairingPhone }, "Pairing code issued");
       } catch (err) {
         logger.error({ err, businessId }, "requestPairingCode failed");
+        const pending = pendingPairingCodes.get(businessId);
+        if (pending) {
+          pending(null, err as Error);
+          pendingPairingCodes.delete(businessId);
+        }
         broadcastToSSE(businessId, { type: "pairing_error", message: "Could not generate code. Check phone number and try again." });
       }
-    }, 3000); // give Baileys time to connect to WA servers before requesting
+    }, 2000); // give Baileys time to connect to WA servers
   }
 
   sock.ev.on("connection.update", async (update) => {
@@ -414,12 +431,40 @@ export function addSSEClient(businessId: number, res: Response): void {
   if (!entry) return;
   entry.sseClients.add(res);
 
-  // Immediately send current state
+  // Immediately replay current state so late-joining clients never miss events
   if (entry.status === "connected" && entry.connectedPhone) {
     res.write(`data: ${JSON.stringify({ type: "connected", phone: entry.connectedPhone })}\n\n`);
+  } else if (entry.pairingCode) {
+    res.write(`data: ${JSON.stringify({ type: "pairing_code", code: entry.pairingCode })}\n\n`);
   } else if (entry.qrDataUrl) {
     res.write(`data: ${JSON.stringify({ type: "qr", qrDataUrl: entry.qrDataUrl })}\n\n`);
   }
+}
+
+/**
+ * Start a pairing-code session and wait until the code is available.
+ * Returns the formatted 8-digit code (e.g. "ABCD-EFGH") or throws on timeout/error.
+ */
+export async function startPairingCodeSession(businessId: number, phone: string): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const timeoutHandle = setTimeout(() => {
+      pendingPairingCodes.delete(businessId);
+      reject(new Error("Timed out waiting for pairing code from WhatsApp. Try again."));
+    }, 15000); // 15s total budget
+
+    pendingPairingCodes.set(businessId, (code, err) => {
+      clearTimeout(timeoutHandle);
+      if (err) reject(err);
+      else if (code) resolve(code);
+      else reject(new Error("No pairing code received"));
+    });
+
+    startSession(businessId, phone).catch((err: Error) => {
+      clearTimeout(timeoutHandle);
+      pendingPairingCodes.delete(businessId);
+      reject(err);
+    });
+  });
 }
 
 export function removeSSEClient(businessId: number, res: Response): void {

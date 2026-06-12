@@ -238,7 +238,7 @@ export function FirebaseSyncTab({ businessId }: FirebaseSyncTabProps) {
                     href={`https://store.advize.in/store/${syncStatus.storeSlug}`}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="text-xs text-primary underline"
+                    className="text-xs text-primary underline break-all"
                   >
                     store.advize.in/store/{syncStatus.storeSlug}
                   </a>

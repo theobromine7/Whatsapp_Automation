@@ -143,7 +143,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
 export function PageLayout({ children }: { children: React.ReactNode }) {
   return (
     <div className="flex-1 overflow-y-auto">
-      <div className="container mx-auto p-4 md:p-8 max-w-5xl">
+      <div className="w-full mx-auto p-4 md:p-8 max-w-5xl overflow-x-hidden">
         {children}
       </div>
     </div>

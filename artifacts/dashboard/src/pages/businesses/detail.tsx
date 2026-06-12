@@ -808,7 +808,7 @@ export default function BusinessDetail() {
     : business.whatsappPhoneNumber ?? null;
 
   return (
-    <div className="space-y-6 animate-in fade-in duration-500 max-w-5xl mx-auto">
+    <div className="space-y-6 animate-in fade-in duration-500">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
         <div className="flex items-center gap-3">
@@ -905,7 +905,7 @@ export default function BusinessDetail() {
         <div className="overflow-x-auto -mx-4 px-4 md:mx-0 md:px-0 pb-1">
           <TabsList className="flex w-max md:grid md:w-full md:grid-cols-6 md:max-w-3xl gap-0">
             <TabsTrigger value="connect" className="gap-1 text-xs md:text-sm px-2.5 md:px-3">
-              <Link2 className="w-3.5 h-3.5 shrink-0" /> <span className="hidden xs:inline">Connect</span><span className="xs:hidden">Link</span>
+              <Link2 className="w-3.5 h-3.5 shrink-0" /> <span className="hidden sm:inline">Connect</span><span className="sm:hidden">Link</span>
             </TabsTrigger>
             <TabsTrigger value="conversations" className="gap-1 text-xs md:text-sm px-2.5 md:px-3">
               <MessageSquare className="w-3.5 h-3.5 shrink-0" /> Chats
@@ -1000,13 +1000,13 @@ export default function BusinessDetail() {
               <CardTitle className="text-base">Conversations</CardTitle>
               <CardDescription>All chat threads managed by the AI agent.</CardDescription>
             </CardHeader>
-            <CardContent>
+            <CardContent className="p-0">
               {convsLoading ? (
-                <div className="space-y-3">
+                <div className="space-y-3 p-6">
                   {[1, 2, 3].map((i) => <Skeleton key={i} className="h-14 w-full" />)}
                 </div>
               ) : !conversations || conversations.length === 0 ? (
-                <div className="flex flex-col items-center gap-3 py-10 text-center">
+                <div className="flex flex-col items-center gap-3 py-10 px-6 text-center">
                   <MessageSquare className="w-8 h-8 text-muted-foreground/50" />
                   <p className="font-medium text-muted-foreground">No conversations yet</p>
                   <p className="text-sm text-muted-foreground max-w-xs">
@@ -1024,17 +1024,17 @@ export default function BusinessDetail() {
                 <div className="divide-y divide-border">
                   {conversations.map((conv) => (
                     <Link key={conv.id} href={`/conversations/${businessId}/${conv.id}`}>
-                      <div className="py-3.5 flex items-center justify-between hover:bg-muted/40 -mx-6 px-6 cursor-pointer transition-colors group">
-                        <div className="flex items-center gap-3">
+                      <div className="py-3.5 px-6 flex items-center justify-between hover:bg-muted/40 cursor-pointer transition-colors group">
+                        <div className="flex items-center gap-3 min-w-0 flex-1">
                           <div className="w-9 h-9 rounded-full bg-secondary flex items-center justify-center shrink-0">
                             <Users className="w-4 h-4 text-secondary-foreground" />
                           </div>
-                          <div>
-                            <p className="font-medium text-sm">{conv.customerName || conv.customerPhone}</p>
-                            <p className="text-xs text-muted-foreground font-mono">{conv.customerPhone}</p>
+                          <div className="min-w-0">
+                            <p className="font-medium text-sm truncate">{conv.customerName || conv.customerPhone}</p>
+                            <p className="text-xs text-muted-foreground font-mono truncate">{conv.customerPhone}</p>
                           </div>
                         </div>
-                        <div className="flex items-center gap-6 text-right">
+                        <div className="flex items-center gap-3 text-right shrink-0 ml-3">
                           <div className="hidden sm:block">
                             <p className="text-xs font-medium">{conv.messageCount} messages</p>
                             <p className="text-xs text-muted-foreground">
@@ -1301,14 +1301,14 @@ export default function BusinessDetail() {
                 <>
                   <div>
                     <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">System Prompt</p>
-                    <div className="bg-muted/50 p-3 rounded-md text-xs font-mono text-muted-foreground whitespace-pre-wrap border">
+                    <div className="bg-muted/50 p-3 rounded-md text-xs font-mono text-muted-foreground whitespace-pre-wrap break-all border overflow-x-auto">
                       {business.systemPrompt}
                     </div>
                   </div>
                   <div>
                     <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">Products / Services</p>
                     {business.products ? (
-                      <div className="bg-muted/50 p-3 rounded-md text-sm whitespace-pre-wrap border">{business.products}</div>
+                      <div className="bg-muted/50 p-3 rounded-md text-sm whitespace-pre-wrap break-words border">{business.products}</div>
                     ) : (
                       <p className="text-sm text-muted-foreground italic">Not set — click Edit to add your product catalog.</p>
                     )}
@@ -1316,7 +1316,7 @@ export default function BusinessDetail() {
                   <div>
                     <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">FAQs</p>
                     {business.faqs ? (
-                      <div className="bg-muted/50 p-3 rounded-md text-sm whitespace-pre-wrap border">{business.faqs}</div>
+                      <div className="bg-muted/50 p-3 rounded-md text-sm whitespace-pre-wrap break-words border">{business.faqs}</div>
                     ) : (
                       <p className="text-sm text-muted-foreground italic">Not set — click Edit to add common Q&amp;As.</p>
                     )}

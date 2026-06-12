@@ -871,7 +871,7 @@ export default function BusinessDetail() {
 
       {/* Main tabs */}
       <Tabs defaultValue={isConnected ? "conversations" : "connect"} className="w-full">
-        <div className="overflow-x-auto -mx-1 px-1 pb-1">
+        <div className="overflow-x-auto -mx-4 px-4 md:mx-0 md:px-0 pb-1">
           <TabsList className="flex w-max md:grid md:w-full md:grid-cols-6 md:max-w-3xl gap-0">
             <TabsTrigger value="connect" className="gap-1 text-xs md:text-sm px-2.5 md:px-3">
               <Link2 className="w-3.5 h-3.5 shrink-0" /> <span className="hidden xs:inline">Connect</span><span className="xs:hidden">Link</span>
@@ -900,13 +900,11 @@ export default function BusinessDetail() {
             {/* QR Card */}
             <Card className={cn("border-2", (!business.connectionType || business.connectionType === "pending" || business.connectionType === "qr_session") && "border-primary/30")}>
               <CardHeader className="pb-3">
-                <div className="flex items-center justify-between">
-                  <CardTitle className="text-base flex items-center gap-2">
-                    <Smartphone className="w-4 h-4 text-primary" />
-                    Scan QR Code
-                  </CardTitle>
+                <CardTitle className="text-base flex items-center gap-2 flex-wrap">
+                  <Smartphone className="w-4 h-4 text-primary shrink-0" />
+                  Scan QR Code
                   <Badge variant="outline" className="text-xs border-primary/30 text-primary bg-primary/5">Recommended</Badge>
-                </div>
+                </CardTitle>
                 <CardDescription className="text-xs">
                   Works like WhatsApp Web. No developer account needed. Scan once, runs 24/7.
                 </CardDescription>

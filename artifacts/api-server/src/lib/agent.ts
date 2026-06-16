@@ -1,13 +1,8 @@
-import OpenAI from "openai";
+import { ai, embedText } from "@workspace/integrations-gemini-ai";
 import { db, whatsappMessagesTable, knowledgeChunksTable } from "@workspace/db";
 import { eq, sql, desc } from "drizzle-orm";
 import { logger } from "./logger";
 import type { Business } from "@workspace/db";
-
-const openai = new OpenAI({
-  apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY,
-  baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL,
-});
 
 const PURCHASE_INTENT_KEYWORDS = [
   "buy", "purchase", "order", "payment", "pay", "how much", "price", "cost",
@@ -149,45 +144,47 @@ Set needsOwner to false for all normal product, price, availability, or FAQ ques
 
   const systemInstruction = fullSystemPrompt + paymentPrompt + jsonFormatInstruction;
 
-  const buildMessages = (msgs: typeof history): OpenAI.Chat.ChatCompletionMessageParam[] => {
-    const result: OpenAI.Chat.ChatCompletionMessageParam[] = [
-      { role: "system", content: systemInstruction },
-      ...msgs.map((msg) => ({
-        role: (msg.role === "assistant" ? "assistant" : "user") as "assistant" | "user",
-        content: msg.content,
-      })),
-      { role: "user", content: customerMessage },
-    ];
+  type GeminiContent = { role: "user" | "model"; parts: { text: string }[] };
+
+  const buildContents = (msgs: typeof history): GeminiContent[] => {
+    const result: GeminiContent[] = msgs.map((msg) => ({
+      role: msg.role === "assistant" ? "model" : "user",
+      parts: [{ text: msg.content }],
+    }));
+    result.push({ role: "user", parts: [{ text: customerMessage }] });
     return result;
   };
 
-  const callOpenAI = async (msgs: typeof history): Promise<AIResponseResult> => {
-    const response = await openai.chat.completions.create({
-      model: "gpt-4o-mini",
-      messages: buildMessages(msgs),
-      max_tokens: 300,
-      response_format: { type: "json_object" },
+  const callGemini = async (msgs: typeof history): Promise<AIResponseResult> => {
+    const response = await ai.models.generateContent({
+      model: "gemini-2.0-flash",
+      config: {
+        systemInstruction,
+        responseMimeType: "application/json",
+        maxOutputTokens: 300,
+      },
+      contents: buildContents(msgs),
     });
 
-    const raw = (response.choices[0]?.message?.content ?? "").trim();
+    const raw = (response.text ?? "").trim();
     return parseStructuredResponse(raw, customerMessage, business.upiId, topProduct);
   };
 
   const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
   try {
-    return await callOpenAI(history);
+    return await callGemini(history);
   } catch (error) {
     const is429 =
       error instanceof Error &&
-      (error.message.includes("429") || error.message.includes("rate_limit") || error.message.includes("Rate limit"));
+      (error.message.includes("429") || error.message.includes("RESOURCE_EXHAUSTED") || error.message.includes("rate"));
     if (is429) {
-      logger.warn({ businessId: business.id }, "OpenAI 429 rate limit — retrying in 2s");
+      logger.warn({ businessId: business.id }, "Gemini 429 rate limit — retrying in 2s");
       await sleep(2000);
       try {
-        return await callOpenAI(history);
+        return await callGemini(history);
       } catch (retryError) {
-        logger.error({ retryError, businessId: business.id }, "OpenAI 429 retry also failed");
+        logger.error({ retryError, businessId: business.id }, "Gemini 429 retry also failed");
         throw retryError;
       }
     }
@@ -203,14 +200,14 @@ Set needsOwner to false for all normal product, price, availability, or FAQ ques
     if (isContextError && history.length > RETRY_HISTORY_MESSAGES) {
       logger.warn({ businessId: business.id, historyLen: history.length }, "Context too long — retrying with shorter history");
       try {
-        return await callOpenAI(history.slice(-RETRY_HISTORY_MESSAGES));
+        return await callGemini(history.slice(-RETRY_HISTORY_MESSAGES));
       } catch (retryError) {
-        logger.error({ retryError, businessId: business.id }, "OpenAI retry also failed");
+        logger.error({ retryError, businessId: business.id }, "Gemini retry also failed");
         throw retryError;
       }
     }
 
-    logger.error({ error, businessId: business.id }, "OpenAI API error");
+    logger.error({ error, businessId: business.id }, "Gemini API error");
     throw error;
   }
 }
@@ -249,7 +246,7 @@ function parseStructuredResponse(
     } else if (typeof parsed.reply === "string" && parsed.reply.trim()) {
       text = parsed.reply.trim();
     } else {
-      logger.warn({ raw }, "OpenAI JSON missing reply field — using fallback");
+      logger.warn({ raw }, "Gemini JSON missing reply field — using fallback");
       text = "How can I help you?";
     }
   } catch {
@@ -258,7 +255,7 @@ function parseStructuredResponse(
       text = raw.trim();
       confidence = 0.9;
     } else {
-      logger.warn({ raw }, "OpenAI returned unparseable response — using fallback");
+      logger.warn({ raw }, "Gemini returned unparseable response — using fallback");
       text = "How can I help you?";
       confidence = 0.5;
     }
@@ -287,14 +284,6 @@ function parseStructuredResponse(
 interface TopProduct {
   name: string;
   price: number;
-}
-
-async function embedText(text: string): Promise<number[]> {
-  const response = await openai.embeddings.create({
-    model: "text-embedding-3-small",
-    input: text,
-  });
-  return response.data[0]!.embedding;
 }
 
 async function retrieveRelevantChunks(

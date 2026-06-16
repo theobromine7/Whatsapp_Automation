@@ -19,7 +19,7 @@ A multi-tenant SaaS platform where any business can register their WhatsApp Busi
 - API: Express 5
 - DB: PostgreSQL + Drizzle ORM
 - Validation: Zod (`zod/v4`), `drizzle-zod`
-- AI: OpenAI via Replit AI Integrations (`openai` package, env vars `AI_INTEGRATIONS_OPENAI_API_KEY` + `AI_INTEGRATIONS_OPENAI_BASE_URL`)
+- AI: Gemini via Replit AI Integrations (`@google/genai` package, env vars `AI_INTEGRATIONS_GEMINI_API_KEY` + `AI_INTEGRATIONS_GEMINI_BASE_URL`)
 - API codegen: Orval (from OpenAPI spec)
 - Build: esbuild (CJS bundle)
 - Frontend: React + Vite, TanStack Query, wouter, shadcn/ui, Tailwind CSS
